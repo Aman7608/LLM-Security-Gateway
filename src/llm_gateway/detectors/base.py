@@ -12,6 +12,10 @@ from llm_gateway.detectors.normalizer import NormalizedText, normalize
 from llm_gateway.models import Finding
 
 
+class DetectorConfigError(ValueError):
+    """A detector's config file is missing or has mistakes."""
+
+
 class Detector(ABC):
     """Base class for the injection, PII and secret detectors."""
 

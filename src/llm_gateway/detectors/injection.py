@@ -37,7 +37,7 @@ from pydantic import (
     model_validator,
 )
 
-from llm_gateway.detectors.base import Detector
+from llm_gateway.detectors.base import Detector, DetectorConfigError
 from llm_gateway.detectors.normalizer import NormalizedText, normalize
 from llm_gateway.models import Finding, RiskLevel
 
@@ -64,8 +64,8 @@ class Category(StrEnum):
     OBFUSCATION = "obfuscation"
 
 
-class RuleConfigError(ValueError):
-    """The rule file is missing or has mistakes."""
+class RuleConfigError(DetectorConfigError):
+    """The injection rule file is missing or has mistakes."""
 
 
 # ---------------------------------------------------------------------------

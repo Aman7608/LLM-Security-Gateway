@@ -50,6 +50,8 @@ select = ["E", "W", "F", "I", "B", "UP", "S"]
 [tool.ruff.lint.per-file-ignores]
 # Tests use plain assert statements, which is normal for pytest
 "tests/**" = ["S101"]
+# Sample prompts are long sentences; splitting them would make them harder to read
+"tests/data/**" = ["S101", "E501"]
 
 # ---------- mypy (type checking) ----------
 [tool.mypy]

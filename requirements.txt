@@ -11,7 +11,13 @@ pydantic-settings==2.16.3   # reads settings from environment variables
 PyYAML==6.0.3               # reads the policy and rule files
 httpx==0.28.1               # sends HTTP requests (AI providers, API tests)
 
+# Added in Phase 6: personal data (PII) detection
+presidio-analyzer==2.2.366  # Microsoft Presidio: finds PII with patterns + NLP
+spacy==3.8.18               # language library Presidio uses for names and places
+# The English language model (about 400 MB), from spaCy's official GitHub releases.
+# It is pinned to an exact file so every install gets the same model.
+en_core_web_lg @ https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl
+
 # Will be added later, in the phase that first needs them:
-#   Phase 6:  presidio-analyzer, presidio-anonymizer, spacy (+ English model)
 #   Phase 10: openai, anthropic (optional, only for real AI providers)
 #   Phase 12: SQLAlchemy, alembic

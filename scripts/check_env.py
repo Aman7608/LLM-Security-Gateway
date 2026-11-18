@@ -25,6 +25,9 @@ REQUIRED_PACKAGES = (
     "pydantic-settings",
     "PyYAML",
     "httpx",
+    "presidio-analyzer",
+    "spacy",
+    "en_core_web_lg",  # the English language model for PII detection
     "pytest",
     "pytest-cov",
     "httpx2",

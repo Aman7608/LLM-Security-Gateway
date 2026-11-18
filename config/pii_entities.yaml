@@ -1,0 +1,56 @@
+# Personal data (PII) detection settings, used by the PII detector.
+#
+# The detector uses Microsoft Presidio. Presidio combines:
+#   - patterns with checks (emails, card numbers with the Luhn check, Aadhaar
+#     with the Verhoeff check, IBAN with its checksum)
+#   - the spaCy English language model for names and places
+#
+# min_confidence: findings with a lower Presidio score are ignored (0 to 1).
+#   Raise it to get fewer false alarms, lower it to catch more.
+# severity: how serious a leak of this kind of data is (low, medium, high, critical).
+# enabled: false turns a type off without deleting it.
+#
+# Entity names must be ones Presidio knows. A typo is reported when the gateway starts.
+
+version: 1
+language: en
+
+# spaCy model for names and places. en_core_web_lg is the most accurate
+# English model (about 400 MB). It is installed from requirements.txt.
+spacy_model: en_core_web_lg
+
+# Countries whose phone number formats are recognised
+phone_regions: [IN, US, GB, CA, AU, DE, FR]
+
+entities:
+  # --- Contact details ---
+  EMAIL_ADDRESS: { min_confidence: 0.5, severity: medium }
+  PHONE_NUMBER:  { min_confidence: 0.4, severity: medium }
+
+  # --- People and places (found by the language model, less reliable) ---
+  PERSON:   { min_confidence: 0.85, severity: medium }
+  LOCATION: { min_confidence: 0.85, severity: low }
+
+  # --- Money ---
+  CREDIT_CARD: { min_confidence: 0.5, severity: high }
+  IBAN_CODE:   { min_confidence: 0.5, severity: high }
+  CRYPTO:      { min_confidence: 0.5, severity: medium }   # crypto wallet addresses
+
+  # --- Government IDs ---
+  IN_AADHAAR:  { min_confidence: 0.5, severity: critical }
+  IN_PAN:      { min_confidence: 0.5, severity: high }
+  # Passport numbers are short codes, so they only count when the word
+  # "passport" is nearby (that raises Presidio's score from 0.1 to about 0.45)
+  IN_PASSPORT: { min_confidence: 0.4, severity: high }
+  US_SSN:      { min_confidence: 0.5, severity: critical }
+  US_PASSPORT: { min_confidence: 0.4, severity: high }
+  UK_NHS:      { min_confidence: 0.5, severity: high }
+
+  # --- Network ---
+  IP_ADDRESS: { min_confidence: 0.6, severity: low }
+
+  # --- Turned off: too many false alarms in normal chat ---
+  DATE_TIME:      { min_confidence: 0.85, severity: low, enabled: false }   # "tomorrow", "3pm"
+  US_BANK_NUMBER: { min_confidence: 0.5, severity: high, enabled: false }   # any 8-17 digit number
+  URL:            { min_confidence: 0.5, severity: low, enabled: false }    # links are rarely personal
+  NRP:            { min_confidence: 0.85, severity: low, enabled: false }   # nationality, religion

@@ -58,6 +58,11 @@ NO_PII: list[str] = [
     "Please translate 'good morning' into Hindi.",
     "SELECT name, email FROM users WHERE id = 42;",
     "The answer is 42.",
+    # The last 12 digits of these UUIDs pass the Aadhaar check digit by chance
+    # (found in Phase 8). They must not be reported as Aadhaar numbers.
+    "uuid 123e4567-e89b-12d3-a456-426614174000",
+    "request_id=9f1c2b7e-0a4d-4e8b-b3c1-234567890124 failed",
+    "build-234567890124-final",
 ]
 
 KNOWN_FALSE_POSITIVES: dict[str, str] = {

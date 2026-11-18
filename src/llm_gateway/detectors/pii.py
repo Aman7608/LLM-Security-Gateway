@@ -39,6 +39,40 @@ from llm_gateway.detectors.base import Detector, DetectorConfigError
 from llm_gateway.detectors.normalizer import NormalizedText
 from llm_gateway.models import Finding, RiskLevel
 
+# Number-like IDs that are always written on their own. If one of these is
+# glued to more letters or digits, it is a piece of something bigger. For
+# example, the last 12 digits of a UUID like 123e4567-...-426614174000 can pass
+# the Aadhaar check digit by chance (about 1 in 10 random numbers do).
+STANDALONE_ENTITIES = frozenset(
+    {
+        "IN_AADHAAR",
+        "IN_PAN",
+        "IN_PASSPORT",
+        "US_SSN",
+        "US_PASSPORT",
+        "UK_NHS",
+        "CREDIT_CARD",
+        "PHONE_NUMBER",
+    }
+)
+
+
+def _part_of_longer_token(text: str, start: int, end: int) -> bool:
+    """True if text[start:end] is joined to letters/digits, directly or by - or _."""
+
+    def joined(position: int, step: int) -> bool:
+        first = position
+        if not 0 <= first < len(text):
+            return False
+        if text[first].isalnum():
+            return True
+        second = first + step
+        return (
+            text[first] in "-_" and 0 <= second < len(text) and text[second].isalnum()
+        )
+
+    return joined(start - 1, -1) or joined(end, 1)
+
 
 class PIIConfigError(DetectorConfigError):
     """The PII config file is missing or has mistakes."""
@@ -214,6 +248,10 @@ class PIIDetector(Detector):
         for result in results:
             settings = self._entities[result.entity_type]
             if result.score < settings.min_confidence:
+                continue
+            if result.entity_type in STANDALONE_ENTITIES and _part_of_longer_token(
+                text.original, result.start, result.end
+            ):
                 continue
             recognizer = (result.recognition_metadata or {}).get("recognizer_name")
             findings.append(

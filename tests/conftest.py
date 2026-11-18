@@ -9,9 +9,11 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from llm_gateway.core.factory import build_dlp_engine
 from llm_gateway.detectors.injection import InjectionDetector
 from llm_gateway.detectors.pii import PIIDetector
 from llm_gateway.detectors.secrets import SecretDetector
+from llm_gateway.dlp.engine import DLPEngine
 from llm_gateway.main import create_app
 from llm_gateway.settings import Settings
 
@@ -43,6 +45,24 @@ def pii_detector() -> PIIDetector:
 def secret_detector() -> SecretDetector:
     """The secret detector with the real pattern file. Loaded once for all tests."""
     return SecretDetector.from_file(SECRET_PATTERNS_FILE)
+
+
+@pytest.fixture(scope="session")
+def dlp_engine(
+    injection_detector: InjectionDetector,
+    pii_detector: PIIDetector,
+    secret_detector: SecretDetector,
+) -> DLPEngine:
+    """The full DLP engine with the real detectors and config/policy.yaml.
+
+    It reuses the detectors above, so the PII model is still loaded only once.
+    """
+    settings = Settings(
+        _env_file=None, policy_file=PROJECT_ROOT / "config" / "policy.yaml"
+    )
+    return build_dlp_engine(
+        settings, detectors=[injection_detector, pii_detector, secret_detector]
+    )
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:

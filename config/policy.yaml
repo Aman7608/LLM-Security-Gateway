@@ -1,0 +1,93 @@
+# Security policy: what to do with each kind of finding.
+#
+# How a decision is made (see docs/09-dlp-engine.md):
+#   1. Each finding is checked against the rules for its direction, TOP TO BOTTOM.
+#   2. The FIRST rule that matches the finding AND whose min_confidence is met
+#      gives that finding its action. Order matters: put specific rules first.
+#   3. A finding that matches no rule is allowed (ignored).
+#   4. The final action is the STRICTEST one: block > redact > warn > allow.
+#   5. If a detector crashed, the request is blocked (GATEWAY_FAIL_MODE=closed)
+#      or only warned (GATEWAY_FAIL_MODE=open).
+#
+# "when" can use any of these (all given ones must match):
+#   detector:      injection, pii or secret
+#   category:      e.g. instruction_override, pii, secret
+#   entity_types:  a list, e.g. [EMAIL_ADDRESS, PHONE_NUMBER]
+#   min_severity:  low, medium, high or critical (this level or higher)
+#
+# Prompt injection can only be warned about or blocked, never redacted:
+# cutting out part of an attack does not make the rest safe.
+
+version: 1
+
+# How redacted text looks: label (<EMAIL_ADDRESS>), mask (*****) or remove ([REDACTED])
+redaction_mode: label
+
+# ---------------------------------------------------------------------------
+# input: prompts going TO the AI provider
+# ---------------------------------------------------------------------------
+input:
+  rules:
+    - id: in-block-injection
+      description: Likely prompt injection. Never send it to the AI.
+      when: { detector: injection }
+      min_confidence: 0.7
+      action: block
+
+    - id: in-warn-possible-injection
+      description: Weak injection signals (often innocent). Log them, let the prompt through.
+      when: { detector: injection }
+      action: warn
+
+    - id: in-redact-secrets
+      description: >-
+        Keys, tokens and passwords must not leave the company. This includes weak
+        matches (random-looking strings, test keys): hiding a harmless ID costs
+        little, while sending a real key to a third party cannot be undone.
+      when: { detector: secret }
+      action: redact
+
+    - id: in-warn-people-and-places
+      description: Names and places are often needed for the task, so only warn.
+      when: { detector: pii, entity_types: [PERSON, LOCATION, IP_ADDRESS] }
+      action: warn
+
+    - id: in-redact-personal-data
+      description: Emails, phone numbers, cards and ID numbers are hidden before the prompt leaves.
+      when: { detector: pii }
+      action: redact
+
+# ---------------------------------------------------------------------------
+# output: answers coming FROM the AI provider
+# ---------------------------------------------------------------------------
+output:
+  rules:
+    - id: out-block-secrets
+      description: An AI answer containing a real-looking secret is withheld completely.
+      when: { detector: secret }
+      min_confidence: 0.7
+      action: block
+
+    - id: out-redact-possible-secrets
+      description: Random-looking strings in answers are hidden, to be safe.
+      when: { detector: secret }
+      action: redact
+
+    - id: out-redact-sensitive-personal-data
+      description: Card numbers and ID numbers are hidden in answers.
+      when: { detector: pii, min_severity: high }
+      action: redact
+
+    - id: out-redact-contact-details
+      description: Emails and phone numbers are hidden in answers.
+      when: { detector: pii, entity_types: [EMAIL_ADDRESS, PHONE_NUMBER] }
+      action: redact
+
+    - id: out-warn-injection-text
+      description: The answer contains attack-like text (for example copied from a document).
+      when: { detector: injection }
+      min_confidence: 0.7
+      action: warn
+
+    # Names, places and IP addresses in answers are allowed: answers
+    # naturally mention people and places, and they match no rule above.

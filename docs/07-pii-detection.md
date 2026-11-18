@@ -279,7 +279,9 @@ For a 2,000-character prompt, both detectors together take about **66 ms**, unde
 | "What is the capital of France?" | spaCy finds "France" as a place, even in a general question |
 | "How tall is Mount Everest?" | Same: places are always reported |
 
-`LOCATION` has **low** severity for this reason. The plan for Phase 9 is to only warn for locations, never block.
+`LOCATION` has **low** severity for this reason. The default policy (Phase 8) only warns for locations, never blocks.
+
+> **Fixed in Phase 8:** the last 12 digits of a UUID (like `...-426614174000`) can pass the Aadhaar check digit by chance, and were reported as an Aadhaar number. Number-like IDs are now ignored when they are part of a longer token. See section 6 of [09-dlp-engine.md](09-dlp-engine.md).
 
 ### Known misses (personal data that is NOT found)
 

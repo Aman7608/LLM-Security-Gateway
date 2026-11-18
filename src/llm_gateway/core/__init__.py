@@ -1,5 +1,6 @@
-"""The gateway pipeline that runs every step in order.
+"""Wiring: builds the gateway's parts from the settings (factory.py).
 
-Phase 8 adds the pipeline. (The text normalizer lives in detectors/normalizer.py,
-because every detector needs it and detectors may not import from core.)
+Phase 13 adds the request pipeline that calls the AI provider. (The text
+normalizer lives in detectors/normalizer.py, because every detector needs it
+and detectors may not import from core.)
 """

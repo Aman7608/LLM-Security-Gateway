@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 from llm_gateway.detectors.injection import InjectionDetector
 from llm_gateway.detectors.pii import PIIDetector
+from llm_gateway.detectors.secrets import SecretDetector
 from llm_gateway.main import create_app
 from llm_gateway.settings import Settings
 
@@ -18,6 +19,7 @@ TESTS_DIR = Path(__file__).parent
 PROJECT_ROOT = TESTS_DIR.parent
 INJECTION_RULES_FILE = PROJECT_ROOT / "config" / "injection_rules.yaml"
 PII_CONFIG_FILE = PROJECT_ROOT / "config" / "pii_entities.yaml"
+SECRET_PATTERNS_FILE = PROJECT_ROOT / "config" / "secret_patterns.yaml"
 TEST_GROUPS = ("unit", "integration", "security", "e2e")
 
 
@@ -35,6 +37,12 @@ def pii_detector() -> PIIDetector:
     the whole test run and shared by every test that asks for it.
     """
     return PIIDetector.from_file(PII_CONFIG_FILE)
+
+
+@pytest.fixture(scope="session")
+def secret_detector() -> SecretDetector:
+    """The secret detector with the real pattern file. Loaded once for all tests."""
+    return SecretDetector.from_file(SECRET_PATTERNS_FILE)
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:

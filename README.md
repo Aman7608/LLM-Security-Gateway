@@ -8,7 +8,7 @@ A security gateway that sits between apps and AI models like OpenAI GPT and Anth
 
 Then, based on configurable rules, it allows, warns about, hides (redacts) or blocks them.
 
-> **Status:** early development (Phase 6 of 19). The prompt injection and personal data (PII) detectors work on their own; they are not connected to the API yet. A full README comes in Phase 18.
+> **Status:** early development (Phase 7 of 19). The prompt injection, personal data (PII) and secret detectors work on their own; they are not connected to the API yet. A full README comes in Phase 18.
 
 ## Quick start (Windows PowerShell)
 
@@ -32,3 +32,4 @@ Then open http://127.0.0.1:8000/health or the API docs at http://127.0.0.1:8000/
 | [docs/05-project-structure.md](docs/05-project-structure.md) | Folders, files and settings |
 | [docs/06-prompt-injection-detection.md](docs/06-prompt-injection-detection.md) | How prompt injection is detected, test results and limits |
 | [docs/07-pii-detection.md](docs/07-pii-detection.md) | How personal data is found and hidden, test results and limits |
+| [docs/08-secret-detection.md](docs/08-secret-detection.md) | How API keys, tokens and passwords are found, test results and limits |

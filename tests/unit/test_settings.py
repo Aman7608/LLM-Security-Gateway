@@ -73,7 +73,7 @@ def test_real_provider_needs_a_key(make_settings: MakeSettings) -> None:
 
 def test_real_provider_works_with_a_key(make_settings: MakeSettings) -> None:
     settings = make_settings(
-        default_provider="openai", openai_api_key="sk-test-not-a-real-key"
+        default_provider="openai", openai_api_key="fake-openai-key-for-tests"
     )
     assert settings.default_provider is ProviderName.OPENAI
 

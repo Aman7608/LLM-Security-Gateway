@@ -1,0 +1,14 @@
+# Save text files with LF line endings in Git.
+# This keeps files working inside Linux Docker containers.
+* text=auto eol=lf
+
+# PowerShell and batch scripts need Windows line endings
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files: leave them alone
+*.png binary
+*.jpg binary
+*.ico binary
+*.db binary

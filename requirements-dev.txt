@@ -1,0 +1,7 @@
+# Tools for development and testing. Not needed to run the gateway.
+-r requirements.txt
+
+pytest==9.2.0         # runs the tests
+pytest-cov==7.1.0     # shows how much code the tests cover
+ruff==0.17.5          # checks code style (PEP 8) and formats code
+mypy==2.4.1           # checks type hints

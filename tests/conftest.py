@@ -9,11 +9,20 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from llm_gateway.detectors.injection import InjectionDetector
 from llm_gateway.main import create_app
 from llm_gateway.settings import Settings
 
 TESTS_DIR = Path(__file__).parent
+PROJECT_ROOT = TESTS_DIR.parent
+INJECTION_RULES_FILE = PROJECT_ROOT / "config" / "injection_rules.yaml"
 TEST_GROUPS = ("unit", "integration", "security", "e2e")
+
+
+@pytest.fixture(scope="session")
+def injection_detector() -> InjectionDetector:
+    """The injection detector with the real rule file. Loaded once for all tests."""
+    return InjectionDetector.from_file(INJECTION_RULES_FILE)
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:

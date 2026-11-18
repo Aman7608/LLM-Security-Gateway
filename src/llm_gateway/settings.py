@@ -61,6 +61,7 @@ class Settings(BaseSettings):
 
     # Files and storage
     policy_file: Path = Path("config/policy.yaml")
+    injection_rules_file: Path = Path("config/injection_rules.yaml")
     database_url: str = "sqlite:///./data/gateway.db"
 
     # AI providers

@@ -98,10 +98,10 @@ flowchart TB
 
     subgraph core["core/"]
         PIPE["GatewayPipeline"]
-        NORM["TextNormalizer"]
     end
 
     subgraph detectors["detectors/"]
+        NORM["TextNormalizer"]
         DBASE["Detector<br/>(shared interface)"]
         INJ["InjectionDetector"]
         PII["PIIDetector<br/>(uses Presidio)"]
@@ -175,7 +175,7 @@ flowchart TB
 |---|---|---|
 | **Middleware** | Give each request an ID, check the API key, apply rate limits and size limits, turn errors into safe JSON | Security decisions |
 | **GatewayPipeline** | Run the steps in order: check prompt, decide, call AI, check answer, decide, log | Detection or decision rules |
-| **TextNormalizer** | Make a cleaned-up copy of the text for checking: remove invisible characters, fix spacing, ignore case, decode Base64 | Change the text that is sent to the AI |
+| **TextNormalizer** | Make a cleaned-up copy of the text for checking: remove invisible characters, fix spacing, ignore case. Lives in `detectors/` (moved there in Phase 5, because detectors may not import from `core/`). Base64 decoding is done by the injection detector | Change the text that is sent to the AI |
 | **InjectionDetector** | Look for prompt injection using rules from a YAML file | Block anything |
 | **PIIDetector** | Ask Presidio to find personal data | Hide it (the Redactor does that) |
 | **SecretDetector** | Look for keys, tokens and passwords | Store the secret |

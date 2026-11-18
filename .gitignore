@@ -30,7 +30,8 @@ coverage.xml
 *.db
 *.sqlite
 *.sqlite3
-data/
+# Only the data folder at the project root (not tests/data, which holds test samples)
+/data/
 logs/
 *.log
 

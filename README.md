@@ -8,7 +8,7 @@ A security gateway that sits between apps and AI models like OpenAI GPT and Anth
 
 Then, based on configurable rules, it allows, warns about, hides (redacts) or blocks them.
 
-> **Status:** early development (Phase 4 of 19). Only the project structure and a `/health` route exist so far. A full README comes in Phase 18.
+> **Status:** early development (Phase 5 of 19). The prompt injection detector works on its own; it is not connected to the API yet. A full README comes in Phase 18.
 
 ## Quick start (Windows PowerShell)
 
@@ -30,3 +30,4 @@ Then open http://127.0.0.1:8000/health or the API docs at http://127.0.0.1:8000/
 | [docs/03-threat-model.md](docs/03-threat-model.md) | Attacks and defences |
 | [docs/04-development-setup.md](docs/04-development-setup.md) | Setting up the tools |
 | [docs/05-project-structure.md](docs/05-project-structure.md) | Folders, files and settings |
+| [docs/06-prompt-injection-detection.md](docs/06-prompt-injection-detection.md) | How prompt injection is detected, test results and limits |

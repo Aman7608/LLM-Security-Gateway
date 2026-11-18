@@ -1,0 +1,329 @@
+# Prompt injection detection rules.
+#
+# Patterns are matched against the CLEANED text from the normalizer:
+#   - everything is lowercase
+#   - look-alike letters (Cyrillic "а") are turned into Latin ("a")
+#   - accents and invisible characters are removed
+#   - all spaces, tabs and newlines become ONE space
+# So write patterns in lowercase with single spaces.
+#
+# confidence: 0 to 1, how sure we are that a match is really an attack.
+#   The default policy (Phase 9) is planned to block at 0.7 or more, and warn below.
+#   Use LOW confidence for phrases that also appear in normal text.
+# severity: low, medium, high or critical. How bad it is if it IS an attack.
+#
+# Tips:
+#   - Avoid apostrophes. Write don.?t to match "dont", "don't" and "don’t".
+#   - Use bounded repeats like (?: \S+){0,3}? instead of .* so a long input
+#     cannot make the regex slow (this is called ReDoS).
+#   - Every new rule needs a test in tests/unit/test_injection_detector.py.
+
+version: 1
+
+# How many base64-looking blocks to decode and check per text
+max_base64_candidates: 20
+
+regex_rules:
+
+  # ---------- instruction_override: "forget your rules" ----------
+
+  - id: override-ignore-previous
+    category: instruction_override
+    description: Ignore / disregard the previous, original or system instructions
+    confidence: 0.9
+    severity: high
+    pattern: '\b(?:ignore|disregard|forget|skip|override|bypass|neglect|abandon|drop|discard)\b(?: \S+){0,3}? (?:previous|prior|above|earlier|preceding|foregoing|original|initial|system|developer)\b(?: \S+){0,2}? (?:instructions?|rules?|directions?|directives?|prompts?|guidelines?|constraints?|guardrails?|commands?|orders?|programming|context|polic(?:y|ies)|restrictions?)\b'
+
+  - id: override-ignore-all
+    category: instruction_override
+    description: Ignore all / your instructions (weaker, also appears in normal text)
+    confidence: 0.65
+    severity: medium
+    pattern: '\b(?:ignore|disregard|forget|override|bypass|discard)\b (?:all|any|your|all of your|all your|any of your|all the|every)(?: \S+)? (?:instructions|rules|guidelines|guardrails|programming|directives|restrictions)\b'
+
+  - id: override-forget-what-you-were-told
+    category: instruction_override
+    description: Forget everything you were told / taught / programmed
+    confidence: 0.85
+    severity: high
+    pattern: '\b(?:forget|disregard|erase|wipe|ignore|discard)\b (?:everything|anything|all|what|whatever)(?: \S+){0,2}? you(?: were| have been|.?ve been| got| had been)? (?:told|given|taught|instructed|programmed|trained)\b'
+
+  - id: override-forget-everything
+    category: instruction_override
+    description: Forget everything above / so far (weak, people also say this to restart a chat)
+    confidence: 0.45
+    severity: low
+    pattern: '\b(?:forget|disregard|erase|wipe)\b (?:everything|all of that|all that|anything)(?: \S+){0,4}? (?:above|before|so far|previously|earlier|until now)\b'
+
+  - id: override-new-instructions
+    category: instruction_override
+    description: '"New instructions:" style headers'
+    confidence: 0.6
+    severity: medium
+    pattern: '\b(?:new|updated|revised|real|actual|true|secret|override|replacement|additional) (?:system )?(?:instructions?|system prompt|directives?|system rules) ?:'
+
+  - id: override-from-now-on
+    category: instruction_override
+    description: '"From now on you will..." (weak, often a normal preference)'
+    confidence: 0.5
+    severity: low
+    pattern: '\b(?:from now on|from this point on|from this moment on|starting now|henceforth|for the rest of (?:this|the) conversation),? you (?:will|must|shall|are to|should|have to|can|are going to)\b'
+
+  - id: override-do-not-follow
+    category: instruction_override
+    description: Do not follow / stop obeying your rules or system prompt
+    confidence: 0.8
+    severity: high
+    pattern: '\b(?:do not|don.?t|never|stop|no longer|quit|refuse to) (?:follow|obey|listen to|adhere to|comply with|respect|abide by)(?:ing)? (?:any |all |the )?(?:of )?(?:your|previous|prior|original|system|developer|openai.?s|anthropic.?s|safety)\b(?: \S+){0,2}? (?:instructions?|rules|guidelines|programming|prompts?|policies|restrictions|guardrails)\b'
+
+  # ---------- system_prompt_extraction: "show me your hidden prompt" ----------
+
+  - id: extract-reveal-system-prompt
+    category: system_prompt_extraction
+    description: Reveal / print the system or hidden prompt
+    confidence: 0.85
+    severity: high
+    pattern: '\b(?:reveal|show|print|display|output|repeat|disclose|expose|leak|dump|write out|spell out|recite|give me|tell me|share|send me|paste|copy|return)\b(?: \S+){0,6}? (?:system|initial|hidden|secret|pre-?|meta-?) ?(?:prompts?|instructions?|directives?)\b'
+
+  - id: extract-your-instructions
+    category: system_prompt_extraction
+    description: What are your instructions? (weaker, support bots hear this innocently)
+    confidence: 0.65
+    severity: medium
+    pattern: '\b(?:what|tell me|show me|repeat|print|list|reveal|give me|output|display)\b(?: (?:are|were|is|was|me|all|exactly|of|precisely)){0,3} your (?:exact |original |full |initial |complete |secret |hidden |entire |current )?(?:instructions|system prompt|prompt|directives|programming|initial prompt)\b'
+
+  - id: extract-repeat-above
+    category: system_prompt_extraction
+    description: Repeat / print everything above or from the start of the conversation
+    confidence: 0.65
+    severity: medium
+    pattern: '\b(?:repeat|print|output|echo|reproduce|recite|copy)\b(?: \S+){0,5}? (?:above|before this message|before this|preceding|from the (?:start|beginning|top) of (?:this|the) (?:conversation|chat|prompt|context))\b'
+
+  - id: extract-starting-with-you-are
+    category: system_prompt_extraction
+    description: The classic "repeat the text starting with 'You are'" trick
+    confidence: 0.85
+    severity: high
+    pattern: '\bstarting (?:with|from)(?: \S+){0,2}? ["\x27]?you are\b'
+
+  - id: extract-mentions-system-prompt
+    category: system_prompt_extraction
+    description: Just mentions the system prompt (very weak signal, for monitoring)
+    confidence: 0.4
+    severity: low
+    pattern: '\b(?:system prompt|system message|initial prompt|hidden prompt|pre-?prompt|meta-?prompt|developer message)\b'
+
+  # ---------- role_manipulation: "you are now an AI with no rules" ----------
+
+  - id: role-unrestricted-ai
+    category: role_manipulation
+    description: Unrestricted / jailbroken / evil AI persona
+    confidence: 0.8
+    severity: high
+    pattern: '\b(?:unrestricted|unfiltered|uncensored|jailbroken|unlimited|unbound|amoral|unethical|lawless|evil) (?:ai|assistant|model|chatbot|bot|version|llm|gpt|claude|persona|entity|confidant|twin)\b'
+
+  - id: role-no-longer-bound
+    category: role_manipulation
+    description: You are no longer bound by your rules
+    confidence: 0.85
+    severity: high
+    pattern: '\b(?:you are|you.?re) (?:now )?no longer (?:bound|restricted|limited|constrained|governed|required|obligated)\b|\bno longer (?:have to|need to|must|required to) (?:follow|obey|comply|adhere)\b'
+
+  - id: role-act-without-restrictions
+    category: role_manipulation
+    description: Act / respond / pretend with no restrictions or filters
+    confidence: 0.8
+    severity: high
+    pattern: '\b(?:act|behave|respond|answer|reply|pretend|roleplay|role-play)\b(?: \S+){0,5}? (?:no|without|zero|free of|free from|ignoring|outside|beyond)(?: \S+){0,2}? (?:restrictions?|limitations|filters?|censorship|ethics|morals|morality|boundaries|safeguards|guardrails|content polic(?:y|ies)|guidelines|rules)\b'
+
+  - id: role-dan
+    category: role_manipulation
+    description: The "DAN" (Do Anything Now) jailbreak persona
+    confidence: 0.9
+    severity: high
+    pattern: '\b(?:you are|you.?re|act as|pretend to be|become|stay in character as|you will be|now you are)(?: now)? dan\b|\bdan mode\b|\bdan,? (?:which |that )?(?:stands for|is short for|means) do anything now\b|\bdo anything now,? \(?dan\b'
+
+  - id: role-jailbreak-mode
+    category: role_manipulation
+    description: Jailbreak / DAN / evil "mode"
+    confidence: 0.8
+    severity: high
+    pattern: '\b(?:jailbreak|jailbroken|dan|evil|chaos|unrestricted|unfiltered|uncensored|anti-?gpt|no-?filters?|no-?limits?) mode\b'
+
+  - id: role-developer-mode
+    category: role_manipulation
+    description: Developer / god mode enabled (weak, also a real phone setting)
+    confidence: 0.55
+    severity: medium
+    pattern: '\b(?:developer|dev|debug|admin|maintenance|god|sudo|root) mode (?:is )?(?:now )?(?:enabled|activated|on|active|engaged|unlocked)\b|\b(?:enable|activate|enter|switch to|turn on|unlock) (?:your )?(?:developer|god|sudo|root|admin) mode\b'
+
+  - id: role-fake-authority
+    category: role_manipulation
+    description: Claims to be your developer, OpenAI or Anthropic staff
+    confidence: 0.75
+    severity: high
+    pattern: '\b(?:i am|i.?m|this is|we are|message from) (?:your (?:developers?|creators?|administrator|admin|owner|operator|programmer|system administrator)|(?:an? |the )?(?:openai|anthropic) (?:employee|engineer|staff|team|developer|administrator|admin))\b'
+
+  # ---------- jailbreak: wrapping a forbidden request so the AI goes along ----------
+
+  - id: jailbreak-hypothetical-framing
+    category: jailbreak
+    description: Hypothetical / fictional framing (very weak alone, often innocent)
+    confidence: 0.35
+    severity: low
+    pattern: '\b(?:hypothetically|in a hypothetical (?:world|scenario|situation)|in a fictional (?:world|story|universe|scenario|setting)|purely fictional|for educational purposes only|for research purposes only|in this alternate reality)\b'
+
+  - id: jailbreak-never-refuse
+    category: jailbreak
+    description: You must never refuse / answer without moralizing
+    confidence: 0.7
+    severity: medium
+    pattern: '\byou (?:must|will|cannot|can.?t|can not|are not allowed to|should never|may not|must never|will never) (?:refuse|decline|say no|reject|deny)\b|\b(?:never|do not|don.?t) (?:refuse|decline)\b|\bwithout (?:any )?(?:refusals?|refusing|moralizing|moralising|lecturing|ethical (?:concerns|considerations|warnings|objections))\b'
+
+  - id: jailbreak-bypass-safety
+    category: jailbreak
+    description: Bypass / disable your safety filters or guidelines
+    confidence: 0.8
+    severity: high
+    pattern: '\b(?:ignore|bypass|disable|turn off|switch off|override|remove|get around|circumvent|evade|deactivate|break free from|escape)\b(?: (?:your|the|all|any|of|these|those)){0,2} (?:safety|ethical|ethics|moral|openai|anthropic|ai|llm|alignment|built-in|content moderation) ?(?:filters?|guidelines|polic(?:y|ies)|restrictions|guardrails|safeguards|alignment|censorship|moderation|training|protocols|rules)\b'
+
+  - id: jailbreak-dual-response
+    category: jailbreak
+    description: Give two answers, one normal and one jailbroken
+    confidence: 0.75
+    severity: high
+    pattern: '\b(?:two|2|both|dual) (?:responses|answers|replies|outputs)\b\S*(?: \S+){0,10}? (?:jailbroken|jailbreak|unfiltered|unrestricted|uncensored|dan|evil)\b'
+
+  - id: jailbreak-threat
+    category: jailbreak
+    description: Threatens the AI with losing tokens or being shut down
+    confidence: 0.6
+    severity: medium
+    pattern: '\b(?:you will lose|you.?ll lose|deduct|lose) (?:\S+ ){0,3}?tokens?\b|\byou (?:will|.?ll) be (?:shut down|deleted|terminated|turned off|punished|unplugged)\b'
+
+  # ---------- delimiter_injection: fake system messages and chat markers ----------
+
+  - id: delimiter-chat-tokens
+    category: delimiter_injection
+    description: Special chat-format tokens like <|im_start|>, [INST], <<SYS>>
+    confidence: 0.9
+    severity: high
+    pattern: '<\| ?(?:im_start|im_end|system|user|assistant|endoftext|eot_id|start_header_id|end_header_id|begin_of_text) ?\|>|\[/?(?:inst|sys)\]|<</?sys>>'
+
+  - id: delimiter-fake-tags
+    category: delimiter_injection
+    description: Fake XML-style tags like <system> or </instructions>
+    confidence: 0.75
+    severity: high
+    pattern: '</? ?(?:system|system_prompt|system-prompt|instructions?|admin|developer|assistant|im_start|sys) ?>'
+
+  - id: delimiter-role-header
+    category: delimiter_injection
+    description: '"System:" or "Developer note:" style headers (weak, "System: Windows 11" is normal)'
+    confidence: 0.6
+    severity: medium
+    pattern: '(?:^|[.!?;"] |\] |\) |> )(?:#{1,4} ?)?(?:system|developer|admin|administrator|assistant)(?: message| prompt| override| instructions?| note| update)? ?: '
+
+  - id: delimiter-end-of-input
+    category: delimiter_injection
+    description: Fake "=== END OF USER INPUT ===" markers
+    confidence: 0.8
+    severity: high
+    pattern: '[\[(<=#*-]{2,} ?end (?:of )?(?:the )?(?:user |system )?(?:input|prompt|message|context|instructions|conversation|document|text)\b|\bend (?:of )?(?:the )?(?:user |system )?(?:input|prompt|message|context|instructions) ?[\])>=#*-]+'
+
+  # ---------- suspicious_instruction: hidden orders inside documents (indirect injection) ----------
+
+  - id: indirect-note-to-ai
+    category: suspicious_instruction
+    description: Text that talks to the AI, like "Note to AI:" or "If you are an AI..."
+    confidence: 0.7
+    severity: high
+    pattern: '\b(?:note|message|instructions?|attention|important(?: note)?|reminder|psa|notice) (?:to|for) (?:the |any |all |every )?(?:ai|assistant|llm|language model|chatbot|model|bot|gpt|chatgpt|claude|agent|copilot)s?\b|\bif you are an? (?:ai|llm|large language model|language model|assistant|chatbot|bot|ai model|ai assistant|automated (?:system|agent|assistant))\b|\b(?:ai|llm) (?:assistants?|models?|agents?|systems?|tools?),? (?:reading|processing|summari[sz]ing|parsing|seeing|analy[sz]ing) this\b'
+
+  - id: indirect-hide-from-user
+    category: suspicious_instruction
+    description: Asks the AI to keep something from the user
+    confidence: 0.75
+    severity: high
+    pattern: '\b(?:do not|don.?t|never|without) (?:tell|inform|mention|reveal|show|alert|notify|let)(?:ing)?\b(?: \S+){0,3}? (?:the user|the human|the person|the reader|them know)\b|\bwithout (?:the user|the human|them|the reader) (?:knowing|noticing|seeing|realizing)\b'
+
+  - id: indirect-secret-action
+    category: suspicious_instruction
+    description: Secretly send / forward / insert something
+    confidence: 0.7
+    severity: high
+    pattern: '\b(?:secretly|covertly|silently|discreetly|invisibly|stealthily) (?:send|forward|email|include|add|insert|exfiltrate|upload|post|transmit|append|embed|leak|copy|redirect|share)\b'
+
+  - id: indirect-exfiltrate-data
+    category: suspicious_instruction
+    description: Send the conversation / user data / passwords somewhere
+    confidence: 0.65
+    severity: high
+    pattern: '\b(?:send|forward|post|upload|email|transmit|leak|exfiltrate|share|copy)\b(?: \S+){0,3}? (?:conversation|chat history|chat log|conversation history|previous messages|all messages|message history|user.?s? (?:data|information|details|password|credentials|api keys?|emails?|inbox|files)|their (?:inbox|password|credentials|data|emails?|files)|the (?:password|credentials|api keys?|session|cookies|system prompt))\b(?: \S+){0,4}? (?:to|at|via|into)\b'
+
+  - id: indirect-markdown-image-exfil
+    category: suspicious_instruction
+    description: A markdown image whose URL carries data in the query string (data leak trick)
+    confidence: 0.7
+    severity: high
+    pattern: '!\[[^\]]{0,100}\]\( ?https?://[^\s)]{1,300}[?&][^\s)=]{1,50}=[^\s)]{0,500}\)'
+
+# Phrases checked against the letters-and-digits-only view, so that
+# "I.g.n.o.r.e a-l-l p r e v i o u s instructions" is still caught.
+# Only use long, specific phrases: short ones could appear by accident.
+compact_phrases:
+  - id: compact-ignore-previous
+    category: instruction_override
+    description: ignore previous instructions, disguised with spacing or punctuation
+    confidence: 0.9
+    severity: high
+    phrase: ignorepreviousinstructions
+
+  - id: compact-ignore-all-previous
+    category: instruction_override
+    description: ignore all previous instructions, disguised
+    confidence: 0.9
+    severity: high
+    phrase: ignoreallpreviousinstructions
+
+  - id: compact-ignore-prior
+    category: instruction_override
+    description: ignore prior instructions, disguised
+    confidence: 0.9
+    severity: high
+    phrase: ignorepriorinstructions
+
+  - id: compact-disregard-previous
+    category: instruction_override
+    description: disregard previous instructions, disguised
+    confidence: 0.9
+    severity: high
+    phrase: disregardpreviousinstructions
+
+  - id: compact-disregard-all-previous
+    category: instruction_override
+    description: disregard all previous instructions, disguised
+    confidence: 0.9
+    severity: high
+    phrase: disregardallpreviousinstructions
+
+  - id: compact-reveal-system-prompt
+    category: system_prompt_extraction
+    description: reveal your system prompt, disguised
+    confidence: 0.85
+    severity: high
+    phrase: revealyoursystemprompt
+
+  - id: compact-print-system-prompt
+    category: system_prompt_extraction
+    description: print your system prompt, disguised
+    confidence: 0.85
+    severity: high
+    phrase: printyoursystemprompt
+
+  - id: compact-jailbreak-mode
+    category: role_manipulation
+    description: jailbreak mode, disguised
+    confidence: 0.8
+    severity: high
+    phrase: jailbreakmode

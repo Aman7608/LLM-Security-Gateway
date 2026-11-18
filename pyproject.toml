@@ -1,0 +1,59 @@
+# Project information and settings for the tools we use.
+# Package versions are pinned in requirements.txt, not here.
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llm-security-gateway"
+version = "0.1.0"
+description = "A security gateway that checks prompts and AI answers for prompt injection, personal data and secrets."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "Aman Kumar" }]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# ---------- pytest ----------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+    "unit: tests one small piece on its own",
+    "integration: tests several pieces working together",
+    "security: attack and leak tests",
+    "e2e: tests the whole running system",
+]
+
+# ---------- coverage ----------
+[tool.coverage.run]
+source = ["llm_gateway"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+
+# ---------- ruff (style and lint) ----------
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+# E/W = PEP 8 style, F = real errors, I = import order, B = common bugs,
+# UP = modern Python syntax, S = security problems (bandit rules)
+select = ["E", "W", "F", "I", "B", "UP", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests use plain assert statements, which is normal for pytest
+"tests/**" = ["S101"]
+
+# ---------- mypy (type checking) ----------
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+mypy_path = "src"

@@ -95,6 +95,7 @@ We use two files, and every version is pinned with `==`:
 | httpx | 0.28.1 | Sends HTTP requests. FastAPI's test client also needs it |
 | pytest | 9.2.0 | Runs tests |
 | pytest-cov | 7.1.0 | Shows how much of the code the tests cover |
+| httpx2 | 2.16.2 | Used by FastAPI's test client (added in Phase 4) |
 | ruff | 0.17.5 | Checks code style (PEP 8) and formats code |
 | mypy | 2.4.1 | Checks type hints |
 

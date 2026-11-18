@@ -1,0 +1,110 @@
+"""All gateway settings, read from environment variables or a .env file.
+
+Every setting has a safe default, so the gateway runs with no .env file at
+all (using the mock AI provider). Each environment variable starts with
+GATEWAY_, for example GATEWAY_PORT=8080.
+
+API keys use SecretStr, so they show up as '**********' if settings are
+printed or logged by mistake.
+"""
+
+from __future__ import annotations
+
+from enum import StrEnum
+from functools import lru_cache
+from pathlib import Path
+
+from pydantic import Field, SecretStr, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Environment(StrEnum):
+    DEVELOPMENT = "development"
+    TEST = "test"
+    PRODUCTION = "production"
+
+
+class FailMode(StrEnum):
+    """What to do when a detector crashes.
+
+    CLOSED blocks the request (safe default). OPEN lets it through with a
+    warning, which keeps apps working but is less safe.
+    """
+
+    CLOSED = "closed"
+    OPEN = "open"
+
+
+class ProviderName(StrEnum):
+    MOCK = "mock"
+    OPENAI = "openai"
+    ANTHROPIC = "anthropic"
+
+
+class Settings(BaseSettings):
+    """Typed settings. Pydantic checks every value when the gateway starts."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="GATEWAY_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        # Treat "GATEWAY_OPENAI_API_KEY=" (empty) the same as not set
+        env_ignore_empty=True,
+    )
+
+    # General
+    environment: Environment = Environment.DEVELOPMENT
+    log_level: str = Field(default="INFO", pattern="^(DEBUG|INFO|WARNING|ERROR)$")
+    host: str = "127.0.0.1"
+    port: int = Field(default=8000, ge=1, le=65535)
+
+    # Files and storage
+    policy_file: Path = Path("config/policy.yaml")
+    database_url: str = "sqlite:///./data/gateway.db"
+
+    # AI providers
+    default_provider: ProviderName = ProviderName.MOCK
+    openai_api_key: SecretStr | None = None
+    anthropic_api_key: SecretStr | None = None
+    provider_timeout_seconds: float = Field(default=30.0, gt=0, le=300)
+    provider_max_retries: int = Field(default=2, ge=0, le=5)
+
+    # Security behaviour
+    fail_mode: FailMode = FailMode.CLOSED
+    max_prompt_chars: int = Field(default=20_000, ge=100, le=1_000_000)
+    store_redacted_prompts: bool = False
+    log_retention_days: int = Field(default=30, ge=1, le=3650)
+
+    # Secret key used to make fingerprints of found secrets (see Phase 12).
+    # Needed in production so fingerprints cannot be guessed.
+    fingerprint_key: SecretStr | None = None
+
+    @model_validator(mode="after")
+    def check_settings_fit_together(self) -> Settings:
+        """Catch setting combinations that would fail later, at startup instead."""
+        if self.default_provider is ProviderName.OPENAI and not self.openai_api_key:
+            raise ValueError(
+                "default_provider is 'openai' but GATEWAY_OPENAI_API_KEY is not set"
+            )
+        if (
+            self.default_provider is ProviderName.ANTHROPIC
+            and not self.anthropic_api_key
+        ):
+            raise ValueError(
+                "default_provider is 'anthropic' but GATEWAY_ANTHROPIC_API_KEY "
+                "is not set"
+            )
+        if self.environment is Environment.PRODUCTION and not self.fingerprint_key:
+            raise ValueError("GATEWAY_FINGERPRINT_KEY must be set in production")
+        return self
+
+
+@lru_cache
+def get_settings() -> Settings:
+    """Load the settings once and reuse them.
+
+    lru_cache means the .env file is only read the first time this runs.
+    Tests can create their own Settings(...) object instead of using this.
+    """
+    return Settings()

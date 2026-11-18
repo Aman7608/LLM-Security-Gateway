@@ -27,6 +27,8 @@ REQUIRED_PACKAGES = (
     "httpx",
     "pytest",
     "pytest-cov",
+    "httpx2",
+    "llm-security-gateway",  # our own code, installed with pip install -e .
     "ruff",
     "mypy",
 )
@@ -47,7 +49,8 @@ class Report:
 def run(cmd: list[str]) -> tuple[int, str]:
     """Run a command and return (exit code, output). Never raises an error."""
     try:
-        result = subprocess.run(
+        # Safe: every command is a fixed list written in this file, never user input
+        result = subprocess.run(  # noqa: S603
             cmd,
             check=False,
             capture_output=True,

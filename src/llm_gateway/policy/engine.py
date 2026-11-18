@@ -1,186 +1,123 @@
-"""Policy engine: turns findings into one decision (allow, warn, redact, block).
-
-This is the Phase 8 version: ordered rules from config/policy.yaml, where the
-first matching rule decides each finding, and the strictest action wins.
-Phase 9 builds on it (risk scoring, policy versions, safe reloading).
+"""Policy engine: turns a ScanResult into one structured Decision.
 
 The policy engine only DECIDES. It never changes text and never runs
-detectors. The DLP engine does those things.
+detectors; the DLP engine does those things.
+
+How a decision is made (docs/10-policy-engine.md explains each step):
+    1. Each finding gets the action of the FIRST rule that applies to it.
+    2. The strictest action wins (block > redact > warn > allow).
+    3. Combine rules: several weak findings together can raise the action.
+    4. Risk = the most serious finding acted on, raised one level when
+       different kinds of problems appear together.
+    5. block_at_risk: block anything at or above a set risk level.
+    6. A crashed detector blocks (fail closed) or warns (fail open).
 """
 
 from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Iterable
-from pathlib import Path
-from typing import Literal
-
-import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from llm_gateway.models import (
     Action,
     Decision,
-    Direction,
     Finding,
     RiskLevel,
     RuleMatch,
     ScanResult,
+    combined_confidence,
     highest,
+    one_level_higher,
     strictest,
 )
+from llm_gateway.policy.schema import Policy, PolicyRule
+from llm_gateway.policy.store import PolicyStore
 from llm_gateway.settings import FailMode
-
-# Categories that can never be redacted, because they come from the injection
-# detector. A rule with these detectors/categories may only warn or block.
-_NOT_INJECTION_CATEGORIES = frozenset({"pii", "secret"})
-
-
-class PolicyError(ValueError):
-    """The policy file is missing or has mistakes."""
-
-
-class Match(BaseModel):
-    """Which findings a rule applies to. Every field that is set must match."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    detector: str | None = None
-    category: str | None = None
-    entity_types: tuple[str, ...] = ()
-    min_severity: RiskLevel | None = None
-
-    def matches(self, finding: Finding) -> bool:
-        if self.detector is not None and finding.detector != self.detector:
-            return False
-        if self.category is not None and finding.category != self.category:
-            return False
-        if self.entity_types and finding.entity_type not in self.entity_types:
-            return False
-        if (
-            self.min_severity is not None
-            and finding.severity.rank < self.min_severity.rank
-        ):
-            return False
-        return True
-
-    def could_match_injection(self) -> bool:
-        """Could an injection finding ever match this? Used to forbid redacting them."""
-        if self.detector not in (None, "injection"):
-            return False
-        if self.category in _NOT_INJECTION_CATEGORIES:
-            return False
-        # Injection findings have no entity type, so a rule that needs one never matches
-        return not self.entity_types
-
-
-class PolicyRule(BaseModel):
-    """One line of the policy: which findings, how confident, what to do."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    id: str = Field(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-    description: str = Field(min_length=1)
-    when: Match = Match()
-    min_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
-    action: Action
-
-    @model_validator(mode="after")
-    def injection_is_never_redacted(self) -> PolicyRule:
-        if self.action is Action.REDACT and self.when.could_match_injection():
-            raise ValueError(
-                f"rule '{self.id}' could redact prompt injection findings. "
-                "Injection can only be warned about or blocked: cutting out part "
-                "of an attack does not make the rest safe. Add 'detector: pii' "
-                "or 'detector: secret' to the rule."
-            )
-        return self
-
-    def applies_to(self, finding: Finding) -> bool:
-        return self.when.matches(finding) and finding.confidence >= self.min_confidence
-
-
-class DirectionPolicy(BaseModel):
-    """The rules for one direction (input or output), in order."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    rules: tuple[PolicyRule, ...] = ()
-
-
-class Policy(BaseModel):
-    """The whole policy file, checked when it is loaded."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    version: Literal[1]
-    redaction_mode: Literal["label", "mask", "remove"] = "label"
-    input: DirectionPolicy
-    output: DirectionPolicy
-
-    @model_validator(mode="after")
-    def rule_ids_are_unique(self) -> Policy:
-        ids = [rule.id for rule in (*self.input.rules, *self.output.rules)]
-        duplicates = sorted({rule_id for rule_id in ids if ids.count(rule_id) > 1})
-        if duplicates:
-            raise ValueError(f"duplicate rule ids: {', '.join(duplicates)}")
-        return self
-
-    def rules_for(self, direction: Direction) -> tuple[PolicyRule, ...]:
-        return self.input.rules if direction is Direction.INPUT else self.output.rules
-
-
-def load_policy(path: Path) -> Policy:
-    """Read and check the policy file. Raises PolicyError with a clear message."""
-    try:
-        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except OSError as error:
-        raise PolicyError(f"cannot read policy file {path}: {error}") from error
-    except yaml.YAMLError as error:
-        raise PolicyError(f"{path} is not valid YAML: {error}") from error
-    if not isinstance(raw, dict):
-        raise PolicyError(f"{path} must contain a YAML mapping at the top level")
-    try:
-        return Policy.model_validate(raw)
-    except ValidationError as error:
-        raise PolicyError(f"{path} has mistakes:\n{error}") from error
 
 
 class PolicyEngine:
-    """Decides what to do with a ScanResult, using the policy rules."""
+    """Decides what to do with a ScanResult, using the current policy."""
 
-    def __init__(self, policy: Policy, fail_mode: FailMode = FailMode.CLOSED) -> None:
-        self.policy = policy
+    def __init__(
+        self,
+        policy: Policy | PolicyStore,
+        fail_mode: FailMode = FailMode.CLOSED,
+    ) -> None:
+        # Accepting a plain Policy keeps tests and simple scripts short
+        self.store = (
+            policy
+            if isinstance(policy, PolicyStore)
+            else PolicyStore.from_policy(policy)
+        )
         self.fail_mode = fail_mode
 
-    @classmethod
-    def from_file(
-        cls, path: Path, fail_mode: FailMode = FailMode.CLOSED
-    ) -> PolicyEngine:
-        return cls(load_policy(path), fail_mode)
+    @property
+    def policy(self) -> Policy:
+        """The policy in use right now (it can change when the store reloads)."""
+        return self.store.current.policy
 
     def decide(self, scan: ScanResult) -> Decision:
-        rules = self.policy.rules_for(scan.direction)
+        # Read the current version ONCE, so a reload in the middle of a
+        # decision cannot mix two policies.
+        version = self.store.current
+        policy = version.policy
+        direction = policy.for_direction(scan.direction)
 
-        # 1. Give each finding the action of the FIRST rule that applies to it
-        matches = []
+        # 1. Each finding gets the action of the FIRST rule that applies to it
+        matches: list[RuleMatch] = []
         for finding in scan.findings:
-            rule = next((r for r in rules if r.applies_to(finding)), None)
+            rule = _first_rule(direction.rules, finding)
             if rule is not None:
                 matches.append(
                     RuleMatch(finding=finding, rule_id=rule.id, action=rule.action)
                 )
+        reasons = _explain(matches)
+        fired: list[str] = []
 
         # 2. The strictest action wins
         action = strictest(m.action for m in matches)
-
-        # 3. Risk = the most serious finding that the policy acted on
         acted_on = [m for m in matches if m.action is not Action.ALLOW]
         risk = highest(m.finding.severity for m in acted_on)
 
-        reasons = _explain(matches)
+        # 3. Several weak signals together
+        for combo in direction.combine:
+            if action.strictness >= combo.action.strictness:
+                continue  # already at least this strict: nothing to add
+            group = [f for f in scan.findings if combo.when.matches(f)]
+            different_rules = {f.rule_id or f.category for f in group}
+            if len(different_rules) < 2:
+                continue
+            score = combined_confidence(group)
+            if score >= combo.min_combined_confidence:
+                fired.append(combo.id)
+                action = strictest([action, combo.action])
+                risk = highest([risk, combo.severity])
+                reasons.append(
+                    f"{combo.id}: {len(different_rules)} different signals, combined "
+                    f"confidence {score:.2f} -> {combo.action.value}"
+                )
 
-        # 4. A crashed detector means we do not know what was missed
+        # 4. Different kinds of problems together are worse than either alone
+        categories = {m.finding.category for m in acted_on}
+        if policy.risk.escalate_on_mixed_categories and len(categories) >= 2:
+            raised = one_level_higher(risk)
+            if raised is not risk:
+                reasons.append(
+                    f"risk raised from {risk.value} to {raised.value}: different kinds "
+                    f"of problems found together ({', '.join(sorted(categories))})"
+                )
+                risk = raised
+
+        # 5. Block anything at or above this direction's risk limit
+        limit = direction.block_at_risk
+        if limit is not None and risk.rank >= limit.rank and action is not Action.BLOCK:
+            action = Action.BLOCK
+            reasons.append(
+                f"blocked: risk {risk.value} is at or above the limit "
+                f"for {scan.direction.value} ({limit.value})"
+            )
+
+        # 6. A crashed detector means we do not know what was missed
         if scan.errors:
             crashed = ", ".join(scan.errors)
             if self.fail_mode is FailMode.CLOSED:
@@ -199,10 +136,16 @@ class PolicyEngine:
         return Decision(
             action=action,
             risk_level=risk,
-            matched_rules=tuple(dict.fromkeys(m.rule_id for m in matches)),
+            matched_rules=tuple(dict.fromkeys([*(m.rule_id for m in matches), *fired])),
             reasons=tuple(reasons),
             matches=tuple(matches),
+            policy_version=version.version,
+            redaction_mode=policy.redaction_mode,
         )
+
+
+def _first_rule(rules: Iterable[PolicyRule], finding: Finding) -> PolicyRule | None:
+    return next((r for r in rules if r.applies_to(finding)), None)
 
 
 def _explain(matches: Iterable[RuleMatch]) -> list[str]:

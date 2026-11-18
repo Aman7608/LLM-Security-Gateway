@@ -20,7 +20,7 @@ from __future__ import annotations
 import base64
 import binascii
 import re
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterator
 from enum import StrEnum
 from itertools import islice
 from pathlib import Path
@@ -323,22 +323,3 @@ def _decode_base64_text(token: str) -> str | None:
     if readable / len(decoded) < 0.9:
         return None
     return decoded
-
-
-def combined_confidence(findings: Iterable[Finding]) -> float:
-    """How sure we are, overall, that the text is an attack (0 to 1).
-
-    Uses the "noisy-OR" formula: each rule that matched is an independent
-    chance of being right, so the chance that ALL of them are wrong is
-    (1 - c1) * (1 - c2) * ..., and the overall confidence is 1 minus that.
-    Example: two rules at 0.6 give 1 - 0.4 * 0.4 = 0.84.
-    The same rule matching many times only counts once.
-    """
-    best: dict[str, float] = {}
-    for finding in findings:
-        key = finding.rule_id or finding.category
-        best[key] = max(best.get(key, 0.0), finding.confidence)
-    chance_all_wrong = 1.0
-    for confidence in best.values():
-        chance_all_wrong *= 1.0 - confidence
-    return round(1.0 - chance_all_wrong, 4)

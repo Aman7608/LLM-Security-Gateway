@@ -1,0 +1,65 @@
+# An example of a STRICTER policy, for organisations that care more about
+# privacy than convenience. To use it:
+#   GATEWAY_POLICY_FILE=config/examples/strict-policy.yaml
+#
+# Differences from config/policy.yaml:
+#   - injection blocks from confidence 0.5 (instead of 0.7)
+#   - names, places and IP addresses are hidden too (instead of only warned)
+#   - prompts and answers with CRITICAL risk are blocked outright
+#   - redacted text says only [REDACTED], not what kind of data it was
+#   - weak injection signals combine into a block sooner (0.7 instead of 0.8)
+
+version: 1
+redaction_mode: remove
+
+risk:
+  escalate_on_mixed_categories: true
+
+input:
+  block_at_risk: critical
+  rules:
+    - id: strict-in-block-injection
+      description: Block even medium-confidence injection.
+      when: { detector: injection }
+      min_confidence: 0.5
+      action: block
+
+    - id: strict-in-warn-injection
+      description: Very weak injection signals are still logged.
+      when: { detector: injection }
+      action: warn
+
+    - id: strict-in-redact-secrets
+      description: Hide every possible secret.
+      when: { detector: secret }
+      action: redact
+
+    - id: strict-in-redact-all-personal-data
+      description: Hide all personal data, including names and places.
+      when: { detector: pii }
+      action: redact
+
+  combine:
+    - id: strict-in-block-weak-signals
+      description: Weak injection signals together are treated as an attack.
+      when: { detector: injection }
+      min_combined_confidence: 0.7
+      action: block
+
+output:
+  block_at_risk: critical
+  rules:
+    - id: strict-out-block-secrets
+      description: Withhold any answer containing a possible secret.
+      when: { detector: secret }
+      action: block
+
+    - id: strict-out-redact-all-personal-data
+      description: Hide all personal data in answers.
+      when: { detector: pii }
+      action: redact
+
+    - id: strict-out-warn-injection
+      description: Log attack-like text in answers.
+      when: { detector: injection }
+      action: warn

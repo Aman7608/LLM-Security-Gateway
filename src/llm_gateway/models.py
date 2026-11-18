@@ -62,6 +62,14 @@ def highest(levels: Iterable[RiskLevel]) -> RiskLevel:
     return max(levels, key=lambda level: level.rank, default=RiskLevel.NONE)
 
 
+def one_level_higher(level: RiskLevel) -> RiskLevel:
+    """LOW -> MEDIUM -> HIGH -> CRITICAL. NONE and CRITICAL stay the same."""
+    if level is RiskLevel.NONE:
+        return level
+    levels = list(RiskLevel)
+    return levels[min(level.rank + 1, len(levels) - 1)]
+
+
 class Finding(BaseModel):
     """One thing a detector found.
 
@@ -91,6 +99,25 @@ class Finding(BaseModel):
     def label(self) -> str:
         """Short name for messages, e.g. "EMAIL_ADDRESS" or "instruction_override"."""
         return self.entity_type or self.category
+
+
+def combined_confidence(findings: Iterable[Finding]) -> float:
+    """How sure we are, overall, that several findings mean a real problem (0 to 1).
+
+    Uses the "noisy-OR" formula: each rule that matched is an independent
+    chance of being right, so the chance that ALL of them are wrong is
+    (1 - c1) * (1 - c2) * ..., and the overall confidence is 1 minus that.
+    Example: two rules at 0.6 give 1 - 0.4 * 0.4 = 0.84.
+    The same rule matching many times only counts once.
+    """
+    best: dict[str, float] = {}
+    for finding in findings:
+        key = finding.rule_id or finding.category
+        best[key] = max(best.get(key, 0.0), finding.confidence)
+    chance_all_wrong = 1.0
+    for confidence in best.values():
+        chance_all_wrong *= 1.0 - confidence
+    return round(1.0 - chance_all_wrong, 4)
 
 
 class ScanResult(BaseModel):
@@ -125,6 +152,13 @@ class Decision(BaseModel):
     matched_rules: tuple[str, ...] = ()
     reasons: tuple[str, ...] = ()
     matches: tuple[RuleMatch, ...] = ()
+    policy_version: int | None = None  # which policy version made this decision
+    redaction_mode: str | None = None  # how that policy wants text hidden
+
+    @property
+    def allowed(self) -> bool:
+        """Can the request (or answer) go ahead? Everything except BLOCK can."""
+        return self.action is not Action.BLOCK
 
     def findings_with(self, action: Action) -> tuple[Finding, ...]:
         """The findings that a rule gave this action, e.g. everything to redact."""

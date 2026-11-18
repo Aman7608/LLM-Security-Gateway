@@ -23,7 +23,8 @@ from llm_gateway.models import (
     RuleMatch,
     ScanResult,
 )
-from llm_gateway.policy.engine import Policy, PolicyEngine
+from llm_gateway.policy.engine import PolicyEngine
+from llm_gateway.policy.schema import Policy
 
 TEXT = "Hello, write to me at me@example.com please"
 EMAIL_START = TEXT.index("me@")

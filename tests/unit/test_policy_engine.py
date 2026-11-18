@@ -12,12 +12,8 @@ import pytest
 import yaml
 
 from llm_gateway.models import Action, Direction, Finding, RiskLevel, ScanResult
-from llm_gateway.policy.engine import (
-    Policy,
-    PolicyEngine,
-    PolicyError,
-    load_policy,
-)
+from llm_gateway.policy.engine import PolicyEngine
+from llm_gateway.policy.schema import Policy, PolicyError, load_policy
 from llm_gateway.settings import FailMode
 from tests.conftest import PROJECT_ROOT
 

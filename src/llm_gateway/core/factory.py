@@ -14,6 +14,7 @@ from llm_gateway.detectors.secrets import SecretDetector
 from llm_gateway.dlp.engine import DLPEngine
 from llm_gateway.dlp.redactor import RedactionMode
 from llm_gateway.policy.engine import PolicyEngine
+from llm_gateway.policy.store import PolicyStore
 from llm_gateway.settings import Settings
 
 
@@ -33,8 +34,13 @@ def build_dlp_engine(
 
     Pass `detectors` to reuse ones that are already loaded (tests do this so
     the PII model is only loaded once).
+
+    If the policy file is broken, the strict built-in policy is used and the
+    problem is logged (see policy/store.py). The gateway never runs without one.
     """
-    policy = PolicyEngine.from_file(settings.policy_file, fail_mode=settings.fail_mode)
+    store = PolicyStore(settings.policy_file)
+    store.load()
+    policy = PolicyEngine(store, fail_mode=settings.fail_mode)
     return DLPEngine(
         detectors=detectors if detectors is not None else build_detectors(settings),
         policy=policy,

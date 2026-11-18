@@ -11,10 +11,9 @@ from llm_gateway.detectors.injection import (
     InjectionDetector,
     InjectionRuleSet,
     RegexRule,
-    combined_confidence,
     load_rules,
 )
-from llm_gateway.models import Finding, RiskLevel
+from llm_gateway.models import Finding, RiskLevel, combined_confidence
 from tests.conftest import INJECTION_RULES_FILE
 
 # One example for every rule in config/injection_rules.yaml.

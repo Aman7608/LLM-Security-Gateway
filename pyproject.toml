@@ -26,6 +26,14 @@ markers = [
     "security: attack and leak tests",
     "e2e: tests the whole running system",
 ]
+# An error inside a background thread fails the test, instead of only
+# printing a warning that is easy to miss (added after the Phase 9 thread bug)
+filterwarnings = [
+    "error::pytest.PytestUnhandledThreadExceptionWarning",
+]
+# If one test runs longer than 120 seconds, print where every thread is
+# stuck. (Added after a full test run hung once and could not be repeated.)
+faulthandler_timeout = 120
 
 # ---------- coverage ----------
 [tool.coverage.run]

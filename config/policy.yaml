@@ -1,12 +1,16 @@
 # Security policy: what to do with each kind of finding.
 #
-# How a decision is made (see docs/09-dlp-engine.md):
+# How a decision is made (see docs/10-policy-engine.md):
 #   1. Each finding is checked against the rules for its direction, TOP TO BOTTOM.
-#   2. The FIRST rule that matches the finding AND whose min_confidence is met
-#      gives that finding its action. Order matters: put specific rules first.
-#   3. A finding that matches no rule is allowed (ignored).
-#   4. The final action is the STRICTEST one: block > redact > warn > allow.
-#   5. If a detector crashed, the request is blocked (GATEWAY_FAIL_MODE=closed)
+#      The FIRST rule that matches it AND whose min_confidence is met gives it
+#      its action. Order matters: put specific rules first.
+#   2. A finding that matches no rule is allowed. The STRICTEST action wins:
+#      block > redact > warn > allow.
+#   3. "combine" rules: several weak findings together can raise the action.
+#   4. Risk = the most serious finding acted on, raised one level when
+#      different kinds of problems appear together (see "risk" below).
+#   5. "block_at_risk" (optional): block anything at or above that risk.
+#   6. If a detector crashed, the request is blocked (GATEWAY_FAIL_MODE=closed)
 #      or only warned (GATEWAY_FAIL_MODE=open).
 #
 # "when" can use any of these (all given ones must match):
@@ -15,13 +19,22 @@
 #   entity_types:  a list, e.g. [EMAIL_ADDRESS, PHONE_NUMBER]
 #   min_severity:  low, medium, high or critical (this level or higher)
 #
-# Prompt injection can only be warned about or blocked, never redacted:
-# cutting out part of an attack does not make the rest safe.
+# Checks when this file is loaded (a broken file is never used):
+#   - prompt injection can only be warned about or blocked, never redacted
+#   - rule ids must be unique
+#   - a rule that can never be reached (a broader rule above it always wins)
+#     is an error
+# If this file is broken at startup, a strict built-in policy is used instead.
 
 version: 1
 
 # How redacted text looks: label (<EMAIL_ADDRESS>), mask (*****) or remove ([REDACTED])
 redaction_mode: label
+
+risk:
+  # An attack plus hidden characters, or personal data plus a secret, is
+  # worse than either alone, so the risk goes up one level.
+  escalate_on_mixed_categories: true
 
 # ---------------------------------------------------------------------------
 # input: prompts going TO the AI provider
@@ -56,6 +69,22 @@ input:
       description: Emails, phone numbers, cards and ID numbers are hidden before the prompt leaves.
       when: { detector: pii }
       action: redact
+
+  # Several weak injection signals in one prompt (each only "warn" on its own)
+  # are treated as an attack when together they are convincing enough.
+  # Combined confidence uses noisy-OR: 1 - (1 - c1) * (1 - c2) * ...
+  # Needs at least two DIFFERENT rules, so one weak phrase alone never blocks.
+  combine:
+    - id: in-block-many-weak-injection-signals
+      description: Several different weak injection signals together are treated as an attack.
+      when: { detector: injection }
+      min_combined_confidence: 0.8
+      action: block
+      severity: high
+
+  # Optional: block any prompt whose final risk is at this level or higher.
+  # Off by default, because redacting is usually enough for personal data.
+  # block_at_risk: critical
 
 # ---------------------------------------------------------------------------
 # output: answers coming FROM the AI provider

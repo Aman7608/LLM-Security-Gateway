@@ -154,7 +154,14 @@ class DLPEngine:
             return None
         to_hide = decision.findings_with(Action.REDACT)
         if to_hide:
-            return redact(text, to_hide, self.redaction_mode)
+            # Use the mode of the policy that made THIS decision, so a policy
+            # reload takes effect at once; fall back to the engine's default.
+            mode = (
+                RedactionMode(decision.redaction_mode)
+                if decision.redaction_mode
+                else self.redaction_mode
+            )
+            return redact(text, to_hide, mode)
         return text  # ALLOW and WARN pass the text on unchanged
 
 

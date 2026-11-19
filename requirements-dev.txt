@@ -1,5 +1,8 @@
 # Tools for development and testing. Not needed to run the gateway.
 -r requirements.txt
+# The provider SDKs are optional to RUN the gateway, but the tests check the
+# provider code (offline, with a fake network), so developers need them.
+-r requirements-providers.txt
 
 # Installs our own code (src/llm_gateway) in "editable" mode, so code
 # changes work right away without reinstalling.

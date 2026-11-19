@@ -1,0 +1,7 @@
+# OPTIONAL: official SDKs for the real AI providers.
+# The gateway works without these (it uses the free, offline mock provider).
+# Install them only if you want to use OpenAI or Anthropic Claude:
+#   .\.venv\Scripts\python.exe -m pip install -r requirements-providers.txt
+
+openai==3.54.0      # OpenAI API
+anthropic==2.10.0   # Anthropic Claude API

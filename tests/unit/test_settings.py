@@ -73,9 +73,16 @@ def test_real_provider_needs_a_key(make_settings: MakeSettings) -> None:
 
 def test_real_provider_works_with_a_key(make_settings: MakeSettings) -> None:
     settings = make_settings(
-        default_provider="openai", openai_api_key="fake-openai-key-for-tests"
+        default_provider="openai",
+        openai_api_key="fake-openai-key-for-tests",
+        openai_model="test-model",
     )
     assert settings.default_provider is ProviderName.OPENAI
+
+
+def test_openai_also_needs_a_model(make_settings: MakeSettings) -> None:
+    with pytest.raises(ValidationError, match="GATEWAY_OPENAI_MODEL"):
+        make_settings(default_provider="openai", openai_api_key="fake-key-for-tests")
 
 
 def test_production_needs_fingerprint_key(make_settings: MakeSettings) -> None:

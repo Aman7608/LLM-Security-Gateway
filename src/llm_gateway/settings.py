@@ -13,6 +13,7 @@ from __future__ import annotations
 from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -69,8 +70,18 @@ class Settings(BaseSettings):
     # AI providers
     default_provider: ProviderName = ProviderName.MOCK
     openai_api_key: SecretStr | None = None
+    # No default OpenAI model on purpose: names change, you pick one
+    openai_model: str | None = Field(default=None, pattern=r"^[A-Za-z0-9._:\-]{1,100}$")
     anthropic_api_key: SecretStr | None = None
-    provider_timeout_seconds: float = Field(default=30.0, gt=0, le=300)
+    anthropic_model: str = Field(
+        default="claude-opus-5-5", pattern=r"^[A-Za-z0-9._:\-]{1,100}$"
+    )
+    # How hard Claude thinks before answering (more effort = slower, costlier)
+    anthropic_effort: Literal["low", "medium", "high", "xhigh", "max"] = "medium"
+    # Let the API retry a refused request on another Claude model
+    anthropic_refusal_fallbacks: bool = True
+    # Per attempt. Claude with thinking can need more than 30 seconds.
+    provider_timeout_seconds: float = Field(default=120.0, gt=0, le=600)
     provider_max_retries: int = Field(default=2, ge=0, le=5)
 
     # Security behaviour
@@ -89,6 +100,10 @@ class Settings(BaseSettings):
         if self.default_provider is ProviderName.OPENAI and not self.openai_api_key:
             raise ValueError(
                 "default_provider is 'openai' but GATEWAY_OPENAI_API_KEY is not set"
+            )
+        if self.default_provider is ProviderName.OPENAI and not self.openai_model:
+            raise ValueError(
+                "default_provider is 'openai' but GATEWAY_OPENAI_MODEL is not set"
             )
         if (
             self.default_provider is ProviderName.ANTHROPIC

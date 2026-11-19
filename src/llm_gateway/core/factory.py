@@ -7,6 +7,18 @@ tests can swap in fake detectors or a different policy easily.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
+from sqlalchemy import Engine
+
+from llm_gateway.audit.database import (
+    create_db_engine,
+    make_session_factory,
+    upgrade_database,
+)
+from llm_gateway.audit.fingerprint import Fingerprinter
+from llm_gateway.audit.logger import AuditLogger
+from llm_gateway.audit.policy_history import PolicyHistory
 from llm_gateway.core.output_guard import OutputGuard
 from llm_gateway.detectors.base import Detector
 from llm_gateway.detectors.confidential import ConfidentialDetector
@@ -16,7 +28,7 @@ from llm_gateway.detectors.secrets import SecretDetector
 from llm_gateway.dlp.engine import DLPEngine
 from llm_gateway.dlp.redactor import RedactionMode
 from llm_gateway.policy.engine import PolicyEngine
-from llm_gateway.policy.store import PolicyStore
+from llm_gateway.policy.store import PolicyStore, PolicyVersion
 from llm_gateway.settings import Settings
 
 
@@ -31,17 +43,22 @@ def build_detectors(settings: Settings) -> list[Detector]:
 
 
 def build_dlp_engine(
-    settings: Settings, detectors: list[Detector] | None = None
+    settings: Settings,
+    detectors: list[Detector] | None = None,
+    policy_history: PolicyHistory | None = None,
 ) -> DLPEngine:
     """Create the DLP engine with the policy and limits from the settings.
 
     Pass `detectors` to reuse ones that are already loaded (tests do this so
     the PII model is only loaded once).
 
+    Pass `policy_history` to save every policy version to the database and
+    carry on the version numbers from the last run.
+
     If the policy file is broken, the strict built-in policy is used and the
     problem is logged (see policy/store.py). The gateway never runs without one.
     """
-    store = PolicyStore(settings.policy_file)
+    store = _policy_store(settings, policy_history)
     store.load()
     policy = PolicyEngine(store, fail_mode=settings.fail_mode)
     return DLPEngine(
@@ -55,3 +72,49 @@ def build_dlp_engine(
 def build_output_guard(settings: Settings, engine: DLPEngine) -> OutputGuard:
     """The output scanner for AI answers, using the same DLP engine."""
     return OutputGuard(engine, blocked_message=settings.output_blocked_message)
+
+
+def _policy_store(settings: Settings, history: PolicyHistory | None) -> PolicyStore:
+    if history is None:
+        return PolicyStore(settings.policy_file)
+    latest = history.latest()
+
+    def save(version: PolicyVersion) -> None:
+        history.save(
+            version.version,
+            version.text,
+            version.checksum,
+            version.created_by,
+            version.source,
+            version.created_at,
+        )
+
+    return PolicyStore(
+        settings.policy_file,
+        on_change=save,
+        resume=(latest.version, latest.checksum) if latest is not None else None,
+    )
+
+
+@dataclass(frozen=True)
+class AuditParts:
+    """Everything the audit log needs, built together."""
+
+    engine: Engine
+    logger: AuditLogger
+    policy_history: PolicyHistory
+    fingerprinter: Fingerprinter
+
+
+def build_audit(settings: Settings, create_tables: bool = True) -> AuditParts:
+    """Connect to the audit database and (by default) create or upgrade its tables."""
+    engine = create_db_engine(settings.database_url)
+    if create_tables:
+        upgrade_database(engine)
+    sessions = make_session_factory(engine)
+    return AuditParts(
+        engine=engine,
+        logger=AuditLogger(sessions, required=settings.audit_required),
+        policy_history=PolicyHistory(sessions),
+        fingerprinter=Fingerprinter.from_settings(settings),
+    )

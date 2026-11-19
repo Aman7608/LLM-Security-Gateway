@@ -12,7 +12,9 @@ Rules this file follows:
     then replaces the old file in one step, so a crash halfway through can
     never leave a half-written policy behind.
 
-History is kept in memory for now. Phase 12 saves it to the database.
+History is kept in memory (the last 50 versions). When the audit database
+is set up, every version is also saved there through `on_change` (see
+core/factory.py), so the history survives restarts.
 """
 
 from __future__ import annotations
@@ -22,6 +24,7 @@ import logging
 import os
 import tempfile
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -47,6 +50,7 @@ class PolicyVersion:
     checksum: str  # SHA-256 of the policy text, to spot any change
     created_by: str
     source: str  # "file", "update", "built-in default" or "code"
+    text: str  # the exact policy text (JSON for built-in and code policies)
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
@@ -57,8 +61,22 @@ def checksum(text: str) -> str:
 class PolicyStore:
     """Holds the active policy and its history. Safe to use from many threads."""
 
-    def __init__(self, path: Path | None = None) -> None:
+    def __init__(
+        self,
+        path: Path | None = None,
+        on_change: Callable[[PolicyVersion], None] | None = None,
+        resume: tuple[int, str] | None = None,
+    ) -> None:
+        """
+        on_change: called with every new version BEFORE it becomes active,
+            for example to save it to the database. If it fails, the
+            version is not used.
+        resume: (number, checksum) of the newest version saved earlier, so
+            numbering carries on after a restart instead of starting at 1.
+        """
         self.path = path
+        self.on_change = on_change
+        self.resume = resume
         self._lock = threading.Lock()  # protects the history list
         # Only ONE change (reload or update) runs at a time, from start to end.
         # Without this, two updates could write the file in one order and
@@ -75,18 +93,19 @@ class PolicyStore:
     def from_policy(cls, policy: Policy, created_by: str = "code") -> PolicyStore:
         """A store holding one policy made in code (used by tests and scripts)."""
         store = cls()
-        store._add(policy, checksum(policy.model_dump_json()), created_by, "code")
+        store._add(policy, policy.model_dump_json(), created_by, "code")
         return store
 
     def load(self) -> PolicyVersion:
-        """Load the policy file at startup. Falls back to the built-in policy."""
+        """Load the policy file at startup. Falls back to the built-in policy.
+
+        Raises PolicyError only if the version cannot be saved (database down).
+        """
         if self.path is None:
             raise PolicyError("this store has no policy file to load")
         try:
             text = self._read()
-            return self._add(
-                parse_policy(text, str(self.path)), checksum(text), "startup", "file"
-            )
+            policy = parse_policy(text, str(self.path))
         except PolicyError as error:
             self.last_error = str(error)
             logger.critical(
@@ -96,10 +115,11 @@ class PolicyStore:
             )
             return self._add(
                 BUILT_IN_DEFAULT_POLICY,
-                checksum(BUILT_IN_DEFAULT_POLICY.model_dump_json()),
+                BUILT_IN_DEFAULT_POLICY.model_dump_json(),
                 "startup",
                 "built-in default",
             )
+        return self._add(policy, text, "startup", "file")
 
     # ---------- reading ----------
 
@@ -141,7 +161,7 @@ class PolicyStore:
                 )
                 raise
             self.last_error = None
-            return self._add(policy, checksum(text), "reload", "file")
+            return self._add(policy, text, "reload", "file")
 
     def update(self, text: str, created_by: str) -> PolicyVersion:
         """Check new policy text, save it to the file, and make it active.
@@ -153,25 +173,55 @@ class PolicyStore:
             raise PolicyError("created_by must be 1 to 100 characters")
         policy = self.validate(text)  # checking needs no lock: it changes nothing
         with self._change_lock:
-            if self.path is not None:
-                self._write_atomically(text)
+            version = self._add(
+                policy, text, created_by, "update", save_file=self.path is not None
+            )
             self.last_error = None
-            return self._add(policy, checksum(text), created_by, "update")
+            return version
 
     # ---------- helpers ----------
 
+    def _next_number(self, text_checksum: str) -> int:
+        if self._history:
+            return self._history[-1].version + 1
+        if self.resume is not None:
+            number, saved_checksum = self.resume
+            # Same text as before the restart: it is the same version
+            return number if saved_checksum == text_checksum else number + 1
+        return 1
+
     def _add(
-        self, policy: Policy, text_checksum: str, created_by: str, source: str
+        self,
+        policy: Policy,
+        text: str,
+        created_by: str,
+        source: str,
+        save_file: bool = False,
     ) -> PolicyVersion:
         with self._lock:
-            number = self._history[-1].version + 1 if self._history else 1
+            text_checksum = checksum(text)
             version = PolicyVersion(
-                version=number,
+                version=self._next_number(text_checksum),
                 policy=policy,
                 checksum=text_checksum,
                 created_by=created_by,
                 source=source,
+                text=text,
             )
+            # Order matters: save the version to the database first, then the
+            # file, and only then make it active. If saving fails, nothing
+            # has changed and the old version stays active.
+            if self.on_change is not None:
+                try:
+                    self.on_change(version)
+                except Exception as error:
+                    raise PolicyError(
+                        f"policy version {version.version} could not be saved "
+                        f"({type(error).__name__}), so it was not made active"
+                    ) from error
+            if save_file:
+                self._write_atomically(text)
+            number = version.version
             # Assigning the new list in one step means readers always see
             # either the old history or the new one, never something half-built.
             self._history = [*self._history, version][-MAX_HISTORY:]

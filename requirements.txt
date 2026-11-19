@@ -18,6 +18,6 @@ spacy==3.8.18               # language library Presidio uses for names and place
 # It is pinned to an exact file so every install gets the same model.
 en_core_web_lg @ https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl
 
-# Will be added later, in the phase that first needs them:
-#   Phase 10: openai, anthropic (optional, only for real AI providers)
-#   Phase 12: SQLAlchemy, alembic
+# Added in Phase 12: the audit log database
+SQLAlchemy==2.1.9           # talks to the database (SQLite now, PostgreSQL later)
+alembic==1.20.1             # creates and upgrades the database tables step by step

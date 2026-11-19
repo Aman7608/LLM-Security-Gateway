@@ -8,7 +8,16 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import Engine
+from sqlalchemy.orm import Session, sessionmaker
 
+from llm_gateway.audit.database import (
+    create_db_engine,
+    make_session_factory,
+    upgrade_database,
+)
+from llm_gateway.audit.fingerprint import Fingerprinter
+from llm_gateway.audit.logger import AuditLogger
 from llm_gateway.core.factory import build_dlp_engine, build_output_guard
 from llm_gateway.core.output_guard import OutputGuard
 from llm_gateway.detectors.confidential import ConfidentialDetector
@@ -26,6 +35,9 @@ PII_CONFIG_FILE = PROJECT_ROOT / "config" / "pii_entities.yaml"
 SECRET_PATTERNS_FILE = PROJECT_ROOT / "config" / "secret_patterns.yaml"
 CONFIDENTIAL_TERMS_FILE = PROJECT_ROOT / "config" / "confidential_terms.yaml"
 TEST_GROUPS = ("unit", "integration", "security", "e2e")
+
+# Only for tests. Long enough to pass the 32-character check.
+TEST_FINGERPRINT_KEY = "test-only-fingerprint-key-" + "x" * 16
 
 
 @pytest.fixture(scope="session")
@@ -124,3 +136,30 @@ def client(make_settings: Callable[..., Settings]) -> Iterator[TestClient]:
     app = create_app(make_settings(environment="test"))
     with TestClient(app) as test_client:
         yield test_client
+
+
+# ---------- audit database (Phase 12) ----------
+
+
+@pytest.fixture
+def audit_db(tmp_path: Path) -> Iterator[Engine]:
+    """A new, empty audit database (a SQLite file) with all tables created."""
+    engine = create_db_engine(f"sqlite:///{(tmp_path / 'audit.db').as_posix()}")
+    upgrade_database(engine)
+    yield engine
+    engine.dispose()  # close the file, so Windows can delete the folder
+
+
+@pytest.fixture
+def audit_sessions(audit_db: Engine) -> sessionmaker[Session]:
+    return make_session_factory(audit_db)
+
+
+@pytest.fixture
+def audit_logger(audit_sessions: sessionmaker[Session]) -> AuditLogger:
+    return AuditLogger(audit_sessions)
+
+
+@pytest.fixture
+def fingerprinter() -> Fingerprinter:
+    return Fingerprinter(TEST_FINGERPRINT_KEY)

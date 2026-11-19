@@ -88,8 +88,13 @@ class Settings(BaseSettings):
     # Security behaviour
     fail_mode: FailMode = FailMode.CLOSED
     max_prompt_chars: int = Field(default=20_000, ge=100, le=1_000_000)
+    # Save the REDACTED prompt with each audit event (never the original)
     store_redacted_prompts: bool = False
+    # Audit events older than this are deleted
     log_retention_days: int = Field(default=30, ge=1, le=3650)
+    # True: refuse requests (503) when the audit log cannot be saved.
+    # False: log the record to the console instead and carry on.
+    audit_required: bool = False
     # Shown instead of an AI answer that was blocked. Never includes the answer.
     output_blocked_message: str = Field(
         default=(
@@ -100,8 +105,9 @@ class Settings(BaseSettings):
         max_length=500,
     )
 
-    # Secret key used to make fingerprints of found secrets (see Phase 12).
-    # Needed in production so fingerprints cannot be guessed.
+    # Secret key for fingerprints of found values (see audit/fingerprint.py).
+    # At least 32 characters. Needed in production so fingerprints cannot be
+    # guessed. Make one with: python -c "import secrets; print(secrets.token_hex(32))"
     fingerprint_key: SecretStr | None = None
 
     @model_validator(mode="after")
@@ -125,6 +131,11 @@ class Settings(BaseSettings):
             )
         if self.environment is Environment.PRODUCTION and not self.fingerprint_key:
             raise ValueError("GATEWAY_FINGERPRINT_KEY must be set in production")
+        if (
+            self.fingerprint_key is not None
+            and len(self.fingerprint_key.get_secret_value()) < 32
+        ):
+            raise ValueError("GATEWAY_FINGERPRINT_KEY must be at least 32 characters")
         return self
 
 

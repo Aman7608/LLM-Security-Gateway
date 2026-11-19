@@ -39,6 +39,10 @@ faulthandler_timeout = 120
 [tool.coverage.run]
 source = ["llm_gateway"]
 branch = true
+# Alembic loads migration files by their path, and coverage does not see
+# them run. They ARE tested: test_migrations_match_the_table_classes only
+# passes if the migrations created exactly the tables in audit/tables.py.
+omit = ["*/audit/migrations/*"]
 
 [tool.coverage.report]
 show_missing = true

@@ -1,0 +1,51 @@
+# Confidential terms: words and phrases that must not leave the organisation.
+#
+# This is where you list YOUR secrets that no general detector can know:
+# project code names, unreleased product names, internal system names,
+# client names under NDA, and "confidential" markings on documents.
+#
+# Patterns run on the CLEANED text (lowercase, single spaces, disguises
+# removed - see docs/06-prompt-injection-detection.md), so write them in
+# lowercase. They are checked in prompts AND in AI answers.
+#
+# confidence: how sure we are that a match really is confidential (0 to 1).
+#   The default policy hides matches at 0.8 or more, and only warns below.
+#
+# The two example code names below are made up. Replace them with your own.
+
+version: 1
+
+terms:
+  # ---------- Your organisation's secrets (examples: replace them) ----------
+
+  - id: example-project-nightingale
+    description: Example secret project code name. Replace with your own.
+    pattern: '\bproject nightingale\b'
+    confidence: 0.95
+    severity: high
+
+  - id: example-unreleased-product
+    description: Example unreleased product name. Replace with your own.
+    pattern: '\bbluebird (?:x|pro|max)\b'
+    confidence: 0.9
+    severity: high
+
+  # ---------- Document markings ----------
+
+  - id: marking-strictly-confidential
+    description: Text marked strictly confidential or restricted
+    pattern: '\b(?:strictly confidential|highly confidential|company confidential|restricted - internal|confidential - do not (?:share|distribute|forward))\b'
+    confidence: 0.85
+    severity: high
+
+  - id: marking-internal-only
+    description: Text marked for internal use only
+    pattern: '\b(?:internal use only|for internal use|internal only|do not distribute|not for (?:external )?distribution|under nda)\b'
+    confidence: 0.7
+    severity: medium
+
+  - id: marking-confidential-word
+    description: The word "confidential" on its own (weak, also used in normal speech)
+    pattern: '\bconfidential\b'
+    confidence: 0.4
+    severity: low

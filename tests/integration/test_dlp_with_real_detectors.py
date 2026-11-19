@@ -110,7 +110,12 @@ def test_password_in_config_only_hides_the_value(dlp_engine: DLPEngine) -> None:
 
 def test_every_detector_ran_and_was_timed(dlp_engine: DLPEngine) -> None:
     result = dlp_engine.process("hello", IN)
-    assert set(result.scan.detector_ms) == {"injection", "pii", "secret"}
+    assert set(result.scan.detector_ms) == {
+        "injection",
+        "pii",
+        "secret",
+        "confidential",
+    }
     assert result.scan.errors == ()
 
 

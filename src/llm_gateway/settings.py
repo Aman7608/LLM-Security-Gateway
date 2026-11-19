@@ -65,6 +65,7 @@ class Settings(BaseSettings):
     injection_rules_file: Path = Path("config/injection_rules.yaml")
     pii_entities_file: Path = Path("config/pii_entities.yaml")
     secret_patterns_file: Path = Path("config/secret_patterns.yaml")
+    confidential_terms_file: Path = Path("config/confidential_terms.yaml")
     database_url: str = "sqlite:///./data/gateway.db"
 
     # AI providers
@@ -89,6 +90,15 @@ class Settings(BaseSettings):
     max_prompt_chars: int = Field(default=20_000, ge=100, le=1_000_000)
     store_redacted_prompts: bool = False
     log_retention_days: int = Field(default=30, ge=1, le=3650)
+    # Shown instead of an AI answer that was blocked. Never includes the answer.
+    output_blocked_message: str = Field(
+        default=(
+            "The answer was withheld by the security gateway because it may "
+            "contain sensitive information."
+        ),
+        min_length=1,
+        max_length=500,
+    )
 
     # Secret key used to make fingerprints of found secrets (see Phase 12).
     # Needed in production so fingerprints cannot be guessed.

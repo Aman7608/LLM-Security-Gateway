@@ -249,14 +249,25 @@ BUILT_IN_DEFAULT_POLICY = Policy.model_validate(
                     "default-in-redact-secrets", "redact", when={"detector": "secret"}
                 ),
                 _rule("default-in-redact-pii", "redact", when={"detector": "pii"}),
+                _rule(
+                    "default-in-redact-confidential",
+                    "redact",
+                    when={"detector": "confidential"},
+                ),
             ]
         },
         "output": {
             "rules": [
+                _rule("default-out-block-leak", "block", when={"detector": "leak"}),
                 _rule(
                     "default-out-block-secrets", "block", when={"detector": "secret"}
                 ),
                 _rule("default-out-redact-pii", "redact", when={"detector": "pii"}),
+                _rule(
+                    "default-out-redact-confidential",
+                    "redact",
+                    when={"detector": "confidential"},
+                ),
                 _rule(
                     "default-out-warn-injection", "warn", when={"detector": "injection"}
                 ),

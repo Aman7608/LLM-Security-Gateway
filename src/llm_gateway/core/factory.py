@@ -7,7 +7,9 @@ tests can swap in fake detectors or a different policy easily.
 
 from __future__ import annotations
 
+from llm_gateway.core.output_guard import OutputGuard
 from llm_gateway.detectors.base import Detector
+from llm_gateway.detectors.confidential import ConfidentialDetector
 from llm_gateway.detectors.injection import InjectionDetector
 from llm_gateway.detectors.pii import PIIDetector
 from llm_gateway.detectors.secrets import SecretDetector
@@ -19,11 +21,12 @@ from llm_gateway.settings import Settings
 
 
 def build_detectors(settings: Settings) -> list[Detector]:
-    """Load the three detectors. Slow (the PII model takes 1 to 3 seconds)."""
+    """Load the four detectors. Slow (the PII model takes 1 to 3 seconds)."""
     return [
         InjectionDetector.from_file(settings.injection_rules_file),
         PIIDetector.from_file(settings.pii_entities_file),
         SecretDetector.from_file(settings.secret_patterns_file),
+        ConfidentialDetector.from_file(settings.confidential_terms_file),
     ]
 
 
@@ -47,3 +50,8 @@ def build_dlp_engine(
         redaction_mode=RedactionMode(policy.policy.redaction_mode),
         max_chars=settings.max_prompt_chars,
     )
+
+
+def build_output_guard(settings: Settings, engine: DLPEngine) -> OutputGuard:
+    """The output scanner for AI answers, using the same DLP engine."""
+    return OutputGuard(engine, blocked_message=settings.output_blocked_message)

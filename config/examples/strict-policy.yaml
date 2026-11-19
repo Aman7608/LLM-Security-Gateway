@@ -39,6 +39,11 @@ input:
       when: { detector: pii }
       action: redact
 
+    - id: strict-in-redact-confidential
+      description: Hide every confidential term and marking, even weak ones.
+      when: { detector: confidential }
+      action: redact
+
   combine:
     - id: strict-in-block-weak-signals
       description: Weak injection signals together are treated as an attack.
@@ -49,6 +54,16 @@ input:
 output:
   block_at_risk: critical
   rules:
+    - id: strict-out-block-leak
+      description: Withhold any answer that repeats the system prompt.
+      when: { detector: leak }
+      action: block
+
+    - id: strict-out-block-confidential
+      description: Withhold any answer containing a confidential term or marking.
+      when: { detector: confidential }
+      action: block
+
     - id: strict-out-block-secrets
       description: Withhold any answer containing a possible secret.
       when: { detector: secret }

@@ -9,7 +9,9 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from llm_gateway.core.factory import build_dlp_engine
+from llm_gateway.core.factory import build_dlp_engine, build_output_guard
+from llm_gateway.core.output_guard import OutputGuard
+from llm_gateway.detectors.confidential import ConfidentialDetector
 from llm_gateway.detectors.injection import InjectionDetector
 from llm_gateway.detectors.pii import PIIDetector
 from llm_gateway.detectors.secrets import SecretDetector
@@ -22,6 +24,7 @@ PROJECT_ROOT = TESTS_DIR.parent
 INJECTION_RULES_FILE = PROJECT_ROOT / "config" / "injection_rules.yaml"
 PII_CONFIG_FILE = PROJECT_ROOT / "config" / "pii_entities.yaml"
 SECRET_PATTERNS_FILE = PROJECT_ROOT / "config" / "secret_patterns.yaml"
+CONFIDENTIAL_TERMS_FILE = PROJECT_ROOT / "config" / "confidential_terms.yaml"
 TEST_GROUPS = ("unit", "integration", "security", "e2e")
 
 
@@ -48,10 +51,17 @@ def secret_detector() -> SecretDetector:
 
 
 @pytest.fixture(scope="session")
+def confidential_detector() -> ConfidentialDetector:
+    """The confidential-terms detector with the real terms file."""
+    return ConfidentialDetector.from_file(CONFIDENTIAL_TERMS_FILE)
+
+
+@pytest.fixture(scope="session")
 def dlp_engine(
     injection_detector: InjectionDetector,
     pii_detector: PIIDetector,
     secret_detector: SecretDetector,
+    confidential_detector: ConfidentialDetector,
 ) -> DLPEngine:
     """The full DLP engine with the real detectors and config/policy.yaml.
 
@@ -61,8 +71,20 @@ def dlp_engine(
         _env_file=None, policy_file=PROJECT_ROOT / "config" / "policy.yaml"
     )
     return build_dlp_engine(
-        settings, detectors=[injection_detector, pii_detector, secret_detector]
+        settings,
+        detectors=[
+            injection_detector,
+            pii_detector,
+            secret_detector,
+            confidential_detector,
+        ],
     )
+
+
+@pytest.fixture(scope="session")
+def output_guard(dlp_engine: DLPEngine) -> OutputGuard:
+    """The output scanner, using the shared DLP engine."""
+    return build_output_guard(Settings(_env_file=None), dlp_engine)
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:

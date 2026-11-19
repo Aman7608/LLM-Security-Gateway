@@ -115,9 +115,23 @@ class DLPEngine:
             errors=tuple(errors),
         )
 
-    def process(self, text: str, direction: Direction) -> DLPResult:
-        """Scan, decide and apply. This is what the rest of the gateway calls."""
+    def process(
+        self,
+        text: str,
+        direction: Direction,
+        extra_findings: Sequence[Finding] = (),
+    ) -> DLPResult:
+        """Scan, decide and apply. This is what the rest of the gateway calls.
+
+        `extra_findings` are findings made somewhere else for THIS text, for
+        example a system prompt leak found by the output guard (that check
+        needs the request's system prompt, which normal detectors never see).
+        They go through the same policy as everything else.
+        """
         started = time.perf_counter()
+        for finding in extra_findings:
+            if finding.end > len(text):
+                raise ValueError("an extra finding points outside the text")
 
         if len(text) > self.max_chars:
             # Too long to scan safely. Block without running any detector, so a
@@ -138,6 +152,12 @@ class DLPEngine:
             )
 
         scan = self.scan(text, direction)
+        if extra_findings:
+            merged = sorted(
+                (*scan.findings, *extra_findings),
+                key=lambda f: (f.start, f.end, f.detector),
+            )
+            scan = scan.model_copy(update={"findings": tuple(merged)})
         decision = self.policy.decide(scan)
 
         return DLPResult(

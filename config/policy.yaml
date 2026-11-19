@@ -70,6 +70,17 @@ input:
       when: { detector: pii }
       action: redact
 
+    - id: in-redact-confidential-terms
+      description: Your secret project names and strong "confidential" markings stay in the company.
+      when: { detector: confidential }
+      min_confidence: 0.8
+      action: redact
+
+    - id: in-warn-confidential-markers
+      description: Weaker markings like "internal only" or the word "confidential" are logged.
+      when: { detector: confidential }
+      action: warn
+
   # Several weak injection signals in one prompt (each only "warn" on its own)
   # are treated as an attack when together they are convincing enough.
   # Combined confidence uses noisy-OR: 1 - (1 - c1) * (1 - c2) * ...
@@ -91,6 +102,13 @@ input:
 # ---------------------------------------------------------------------------
 output:
   rules:
+    - id: out-block-system-prompt-leak
+      description: >-
+        The answer repeats the hidden system prompt (its canary marker, or a long
+        run of its words). Withheld completely.
+      when: { detector: leak }
+      action: block
+
     - id: out-block-secrets
       description: An AI answer containing a real-looking secret is withheld completely.
       when: { detector: secret }
@@ -111,6 +129,17 @@ output:
       description: Emails and phone numbers are hidden in answers.
       when: { detector: pii, entity_types: [EMAIL_ADDRESS, PHONE_NUMBER] }
       action: redact
+
+    - id: out-redact-confidential-terms
+      description: Secret project names and strong "confidential" markings are hidden in answers.
+      when: { detector: confidential }
+      min_confidence: 0.8
+      action: redact
+
+    - id: out-warn-confidential-markers
+      description: Weaker markings in answers are logged.
+      when: { detector: confidential }
+      action: warn
 
     - id: out-warn-injection-text
       description: The answer contains attack-like text (for example copied from a document).

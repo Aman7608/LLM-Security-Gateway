@@ -74,7 +74,7 @@ Many services start their keys with a fixed **prefix**, which makes them easy to
 |---|---|---|---|
 | Password in a URL | `postgres://user:<value>@host` | `PASSWORD_IN_URL` | 0.9 |
 | Password in config or code | `password=<value>`, `DB_PASSWORD: <value>`, `api_key = "<value>"` | `SECRET_ASSIGNMENT` | 0.75 |
-| Password in a sentence | "My password is `<value>`" | `PASSWORD` | 0.7 |
+| Password in a sentence | "My password is `<value>`", "the database password is `<value>`" (up to two words before "password") | `PASSWORD` | 0.7 |
 
 ### Unknown formats: the entropy check
 

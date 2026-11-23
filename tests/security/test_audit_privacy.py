@@ -192,17 +192,10 @@ def test_console_copy_has_no_values_either(
         assert value not in lines
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "known limit: a saved prompt only hides what the detectors find, and the "
-        "secret detector misses 'the database password is ...' (a word between "
-        "'the' and 'password')"
-    ),
-)
-def test_undetected_secret_in_a_saved_prompt(
+def test_secret_after_a_describing_word_is_not_saved(
     dlp_engine: DLPEngine, fingerprinter: Fingerprinter
 ) -> None:
+    """Was a known miss in Phase 12: a word between "the" and "password"."""
     prompt = f"The database {PW} is {FAKE_CONFIG_PASS}"
     checked = dlp_engine.process(prompt, Direction.INPUT)
     entry = build_audit_entry(

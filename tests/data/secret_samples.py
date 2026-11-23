@@ -165,6 +165,10 @@ SECRET_SAMPLES: list[tuple[str, str, str]] = [
         "PASSWORD",
         FAKE_SENTENCE_PASS,
     ),
+    # One or two words between "the" and "password" (found in Phase 12)
+    (f"The database {PW} is {FAKE_CONFIG_PASS}", "PASSWORD", FAKE_CONFIG_PASS),
+    (f"our wifi {PW} is {FAKE_SENTENCE_PASS}", "PASSWORD", FAKE_SENTENCE_PASS),
+    (f"The prod admin {PW} was {FAKE_YAML_PASS}", "PASSWORD", FAKE_YAML_PASS),
     (f"session id {RANDOM_TOKEN} expires soon", "HIGH_ENTROPY_STRING", RANDOM_TOKEN),
 ]
 
@@ -177,6 +181,10 @@ NO_SECRETS: list[str] = [
     f"Enter your {PW}: ********",
     f"The {PW} field must be at least 8 characters long.",
     f"My {PW} is strong.",
+    f"The new {PW} is ready.",
+    f"The database {PW} is stored in the vault.",
+    f"Your old login {PW} was too short.",
+    f"The {PW} reset link is in your email.",
     f"if ({PW} == confirmPassword) {{ login() }}",
     f"{PW} = get_secret('db')",
     f"postgres://user:{PW}@localhost:5432/mydb",

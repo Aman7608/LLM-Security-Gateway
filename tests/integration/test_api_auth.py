@@ -56,6 +56,7 @@ def test_client_key_works_on_client_routes(client: TestClient, api_keys: Keys) -
         ("GET", "/v1/events"),
         ("GET", "/v1/events/req-1"),
         ("GET", "/v1/stats"),
+        ("GET", "/v1/stats/timeline"),
         ("GET", "/v1/policies/active"),
         ("PUT", "/v1/policies/active"),
         ("POST", "/v1/policies/validate"),

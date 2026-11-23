@@ -6,7 +6,9 @@ to the database. FastAPI runs them in a worker thread for us.
 
 from __future__ import annotations
 
-from typing import Annotated
+import math
+from datetime import UTC, datetime, timedelta
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Path, Query
 from pydantic import AwareDatetime
@@ -20,7 +22,12 @@ from llm_gateway.api.schemas import (
     PolicyBody,
     ValidateReply,
 )
-from llm_gateway.audit.logger import AuditStats, EventFilter
+from llm_gateway.audit.logger import (
+    MAX_TIMELINE_POINTS,
+    AuditStats,
+    EventFilter,
+    TimelinePoint,
+)
 from llm_gateway.audit.policy_history import SavedPolicy
 from llm_gateway.audit.records import REQUEST_ID_PATTERN, AuditEntry
 from llm_gateway.policy.schema import PolicyError
@@ -68,6 +75,41 @@ def stats(
 ) -> AuditStats:
     """Counts for the dashboard, optionally only since a given time."""
     return gateway.audit.logger.stats(since=since)
+
+
+STEPS = {"hour": timedelta(hours=1), "day": timedelta(days=1)}
+
+
+@router.get("/stats/timeline")
+def timeline(
+    admin: Admin,
+    gateway: GatewayDep,
+    hours: Annotated[int, Query(ge=1, le=24 * 90)] = 24,
+    step: Literal["hour", "day"] = "hour",
+) -> list[TimelinePoint]:
+    """Events per hour or per day over the last `hours`, for the risk chart.
+
+    Steps start on whole hours or whole days (UTC), and the last step is the
+    current one, so the newest events are always included.
+    """
+    size = STEPS[step]
+    points = math.ceil(timedelta(hours=hours) / size)
+    if points > MAX_TIMELINE_POINTS:
+        raise ApiError(
+            422,
+            "invalid_request",
+            f"That is {points} points; the most is {MAX_TIMELINE_POINTS}. "
+            "Use step=day for long periods.",
+        )
+    end = _round_down(datetime.now(UTC), size) + size
+    return gateway.audit.logger.timeline(end - points * size, end, size)
+
+
+def _round_down(moment: datetime, size: timedelta) -> datetime:
+    """The start of the hour or the day (UTC) that `moment` is in."""
+    if size == timedelta(days=1):
+        return moment.replace(hour=0, minute=0, second=0, microsecond=0)
+    return moment.replace(minute=0, second=0, microsecond=0)
 
 
 # ---------- policy ----------

@@ -152,6 +152,41 @@ def test_stats(client: TestClient, api_keys: Keys, some_events: list[str]) -> No
     assert data["total_events"] == 3
     assert data["by_status"] == {"scan_only": 3}
     assert data["by_input_action"]["block"] == 1
+    assert data["events_by_detector"] == {"pii": 1, "injection": 1}
+
+
+def test_timeline_per_hour(
+    client: TestClient, api_keys: Keys, some_events: list[str]
+) -> None:
+    response = client.get("/v1/stats/timeline", headers=api_keys["admin"])
+    points = response.json()
+    assert len(points) == 24
+    # The 3 scans are in the newest hour (or the one before, if the hour
+    # changed between the scans and this request)
+    assert sum(p["total"] for p in points[-2:]) == 3
+    assert sum(p["by_risk"]["critical"] for p in points) == 1
+    assert points[0]["start"].endswith(":00:00Z")
+
+
+def test_timeline_per_day(
+    client: TestClient, api_keys: Keys, some_events: list[str]
+) -> None:
+    response = client.get(
+        "/v1/stats/timeline?hours=168&step=day", headers=api_keys["admin"]
+    )
+    points = response.json()
+    assert len(points) == 7
+    assert sum(p["total"] for p in points[-2:]) == 3
+    assert points[0]["start"].endswith("T00:00:00Z")
+
+
+@pytest.mark.parametrize(
+    "query", ["hours=2000", "hours=0", "hours=5000&step=day", "step=week"]
+)
+def test_timeline_limits(client: TestClient, api_keys: Keys, query: str) -> None:
+    response = client.get(f"/v1/stats/timeline?{query}", headers=api_keys["admin"])
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "invalid_request"
 
 
 # ---------- policy ----------

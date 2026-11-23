@@ -43,6 +43,7 @@ The routes in `api/` are thin. The real work happens in `core/gateway.py`, which
 | GET | `/v1/events` | admin | The audit log, with filters and pages |
 | GET | `/v1/events/{request_id}` | admin | One event with its findings |
 | GET | `/v1/stats` | admin | Counts for the dashboard |
+| GET | `/v1/stats/timeline` | admin | Events per hour or day by risk level, for the dashboard chart (added in Phase 14) |
 | GET | `/v1/policies/active` | admin | The policy in use, with its exact text |
 | PUT | `/v1/policies/active` | admin | Replace the policy (checked first; makes a new version) |
 | POST | `/v1/policies/validate` | admin | Check a policy without using it |

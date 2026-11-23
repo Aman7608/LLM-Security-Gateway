@@ -223,6 +223,8 @@ def test_stats(filled: AuditLogger) -> None:
         "jailbreak": 1,
         "AWS_ACCESS_KEY": 1,
     }
+    # e2 has two PII findings but is one event; e4's test finding is "pii" too
+    assert stats.events_by_detector == {"pii": 2, "injection": 1}
     assert stats.failed_writes == 0
 
 
@@ -234,6 +236,41 @@ def test_stats_since(filled: AuditLogger) -> None:
 
 def test_stats_of_an_empty_log(audit_logger: AuditLogger) -> None:
     assert audit_logger.stats().total_events == 0
+
+
+def test_timeline_per_hour(filled: AuditLogger) -> None:
+    start = NOW - timedelta(hours=5)
+    points = filled.timeline(start, NOW + timedelta(hours=1), timedelta(hours=1))
+    assert [p.start for p in points] == [start + timedelta(hours=n) for n in range(6)]
+    assert [p.total for p in points] == [0, 1, 1, 1, 1, 1]
+    assert points[3].by_risk["critical"] == 1  # e3, two hours before NOW
+    assert set(points[0].by_risk) == {level.value for level in RiskLevel}
+
+
+def test_timeline_end_is_not_included(filled: AuditLogger) -> None:
+    points = filled.timeline(NOW - timedelta(hours=1), NOW, timedelta(hours=1))
+    assert [p.total for p in points] == [1]  # e4 only; e5 is exactly at NOW
+
+
+def test_timeline_per_day(filled: AuditLogger) -> None:
+    day = datetime(2026, 11, 20, tzinfo=UTC)
+    points = filled.timeline(day, day + timedelta(days=1), timedelta(days=1))
+    assert [p.total for p in points] == [5]
+
+
+@pytest.mark.parametrize(
+    ("start", "step", "problem"),
+    [
+        (NOW - timedelta(days=30), timedelta(hours=1), "720 points"),
+        (NOW, timedelta(hours=1), "end must be after start"),
+        (NOW - timedelta(hours=1), timedelta(0), "step must be positive"),
+    ],
+)
+def test_timeline_limits(
+    audit_logger: AuditLogger, start: datetime, step: timedelta, problem: str
+) -> None:
+    with pytest.raises(ValueError, match=problem):
+        audit_logger.timeline(start, NOW, step)
 
 
 # ---------- deleting old events (NFR-04) ----------

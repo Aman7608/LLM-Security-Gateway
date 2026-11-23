@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+/* Colours are set once here, for light and dark mode. Components use the
+   names below (bg-surface, text-ink, ...) and never raw colour codes. */
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #6f6d68;
+  --line: #e1e0d9;
+  --axis: #c3c2b7;
+  --accent: #2a78d6;
+  --good: #006300;
+  --bad: #b3261e;
+  --warn-bg: #fff4d6;
+  /* Risk levels have an order, so they use one blue from light to dark.
+     Checked with a colour validator: steps read in order in both modes. */
+  --risk-none: #86b6ef;
+  --risk-low: #5598e7;
+  --risk-medium: #2a78d6;
+  --risk-high: #1c5cab;
+  --risk-critical: #0d366b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #f0efec;
+    --ink-2: #c3c2b7;
+    --muted: #a3a19a;
+    --line: #2c2c2a;
+    --axis: #383835;
+    --accent: #6da7ec;
+    --good: #0ca30c;
+    --bad: #f07a72;
+    --warn-bg: #3a2e0c;
+    --risk-none: #184f95;
+    --risk-low: #256abf;
+    --risk-medium: #3987e5;
+    --risk-high: #6da7ec;
+    --risk-critical: #b7d3f6;
+  }
+}
+
+@theme inline {
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-axis: var(--axis);
+  --color-accent: var(--accent);
+  --color-good: var(--good);
+  --color-bad: var(--bad);
+  --color-warn-bg: var(--warn-bg);
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+body {
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}

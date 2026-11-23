@@ -13,6 +13,7 @@ What happens if the database is down?
 from __future__ import annotations
 
 import logging
+import math
 import threading
 from collections import Counter
 from datetime import UTC, datetime, timedelta
@@ -30,6 +31,7 @@ from llm_gateway.models import Action, Direction, RiskLevel
 logger = logging.getLogger(__name__)
 
 MAX_PAGE_SIZE = 500
+MAX_TIMELINE_POINTS = 400
 
 
 class AuditWriteError(Exception):
@@ -65,7 +67,20 @@ class AuditStats(BaseModel):
     by_input_action: dict[str, int]
     by_output_action: dict[str, int]
     by_finding_type: dict[str, int]
+    # How many events had at least one finding from each detector,
+    # e.g. {"injection": 3, "pii": 10, "secret": 2}
+    events_by_detector: dict[str, int]
     failed_writes: int  # since the gateway started
+
+
+class TimelinePoint(BaseModel):
+    """How many events started in one hour or one day, per risk level."""
+
+    model_config = ConfigDict(frozen=True)
+
+    start: datetime
+    total: int
+    by_risk: dict[str, int]  # every risk level is listed, 0 if none
 
 
 class AuditLogger:
@@ -172,6 +187,14 @@ class AuditLogger:
                 .where(FindingRecord.request_id.in_(select(sub.c.request_id)))
                 .group_by(label)
             )
+            detector_rows = session.execute(
+                select(
+                    FindingRecord.detector,
+                    func.count(func.distinct(FindingRecord.request_id)),
+                )
+                .where(FindingRecord.request_id.in_(select(sub.c.request_id)))
+                .group_by(FindingRecord.detector)
+            )
             return AuditStats(
                 total_events=int(
                     session.scalar(select(func.count()).select_from(sub)) or 0
@@ -183,8 +206,42 @@ class AuditLogger:
                 by_finding_type=dict(
                     Counter({str(k): int(n) for k, n in finding_rows}).most_common()
                 ),
+                events_by_detector={str(k): int(n) for k, n in detector_rows},
                 failed_writes=self.failed_writes,
             )
+
+    def timeline(
+        self, start: datetime, end: datetime, step: timedelta
+    ) -> list[TimelinePoint]:
+        """Events per time step between start and end, for the risk chart.
+
+        Steps with no events are included with zeros, so a chart shows the
+        quiet times too. Counting happens in Python (not SQL) because each
+        database groups dates differently. Only two small columns are read,
+        which is fine for the numbers this project handles.
+        """
+        if step <= timedelta(0) or end <= start:
+            raise ValueError("step must be positive and end must be after start")
+        points = math.ceil((end - start) / step)
+        if points > MAX_TIMELINE_POINTS:
+            raise ValueError(
+                f"that would be {points} points; the most is {MAX_TIMELINE_POINTS}"
+            )
+        counts = [Counter[str]() for _ in range(points)]
+        query = select(AuditEvent.timestamp, AuditEvent.risk_level).where(
+            AuditEvent.timestamp >= start, AuditEvent.timestamp < end
+        )
+        with self.sessions() as session:
+            for timestamp, risk in session.execute(query):
+                counts[int((timestamp - start) // step)][str(risk)] += 1
+        return [
+            TimelinePoint(
+                start=start + n * step,
+                total=sum(found.values()),
+                by_risk={level.value: found[level.value] for level in RiskLevel},
+            )
+            for n, found in enumerate(counts)
+        ]
 
 
 def _apply(query: Select[Any], filters: EventFilter | None) -> Select[Any]:

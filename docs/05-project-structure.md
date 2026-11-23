@@ -52,7 +52,7 @@ LLM Security Guard New/
 
 Not in Git, but created on your computer: `.venv/` (virtual environment), `.env` (your real settings, if you make one) and `data/` (the database, from Phase 12).
 
-Later phases add `frontend/` (dashboard, Phase 14) and the Docker files (Phase 15).
+Later phases add `frontend/` (the dashboard, added in Phase 14; see [15-dashboard.md](15-dashboard.md)) and the Docker files (Phase 15).
 
 ---
 

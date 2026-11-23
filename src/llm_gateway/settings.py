@@ -85,6 +85,14 @@ class Settings(BaseSettings):
     provider_timeout_seconds: float = Field(default=120.0, gt=0, le=600)
     provider_max_retries: int = Field(default=2, ge=0, le=5)
 
+    # API limits (checked before any scanning, so they are cheap)
+    rate_limit_per_minute: int = Field(default=60, ge=1, le=100_000)  # per API key
+    max_request_bytes: int = Field(default=1_000_000, ge=1_000, le=50_000_000)
+    # All messages and documents of one chat together. Scanning gets slow for
+    # long texts (19,000 characters took 2 to 4 seconds), so this keeps one
+    # request from keeping the gateway busy for minutes.
+    max_request_chars: int = Field(default=50_000, ge=1_000, le=200_000)
+
     # Security behaviour
     fail_mode: FailMode = FailMode.CLOSED
     max_prompt_chars: int = Field(default=20_000, ge=100, le=1_000_000)

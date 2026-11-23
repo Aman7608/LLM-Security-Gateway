@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
@@ -18,7 +19,12 @@ from llm_gateway.audit.database import (
 )
 from llm_gateway.audit.fingerprint import Fingerprinter
 from llm_gateway.audit.logger import AuditLogger
-from llm_gateway.core.factory import build_dlp_engine, build_output_guard
+from llm_gateway.core.factory import (
+    build_dlp_engine,
+    build_gateway,
+    build_output_guard,
+)
+from llm_gateway.core.gateway import Gateway
 from llm_gateway.core.output_guard import OutputGuard
 from llm_gateway.detectors.confidential import ConfidentialDetector
 from llm_gateway.detectors.injection import InjectionDetector
@@ -130,12 +136,64 @@ def make_settings() -> Callable[..., Settings]:
     return _make
 
 
+# ---------- the whole gateway and its API (Phase 13) ----------
+
+
 @pytest.fixture
-def client(make_settings: Callable[..., Settings]) -> Iterator[TestClient]:
-    """A test client that sends requests to the app without starting a server."""
-    app = create_app(make_settings(environment="test"))
-    with TestClient(app) as test_client:
+def gateway_settings(tmp_path: Path) -> Settings:
+    """Settings for one test: its own database and its own copy of the policy.
+
+    The policy is copied because PUT /v1/policies/active writes the file,
+    and tests must never change the real config/policy.yaml.
+    """
+    policy_file = tmp_path / "policy.yaml"
+    shutil.copy(PROJECT_ROOT / "config" / "policy.yaml", policy_file)
+    return Settings(
+        _env_file=None,
+        environment="test",
+        database_url=f"sqlite:///{(tmp_path / 'gateway.db').as_posix()}",
+        policy_file=policy_file,
+        fingerprint_key=TEST_FINGERPRINT_KEY,
+        provider_max_retries=0,  # no waiting between retries in tests
+        rate_limit_per_minute=10_000,
+    )
+
+
+@pytest.fixture
+def gateway(
+    gateway_settings: Settings,
+    injection_detector: InjectionDetector,
+    pii_detector: PIIDetector,
+    secret_detector: SecretDetector,
+    confidential_detector: ConfidentialDetector,
+) -> Iterator[Gateway]:
+    """A full gateway that reuses the detectors loaded once for all tests."""
+    built = build_gateway(
+        gateway_settings,
+        detectors=[
+            injection_detector,
+            pii_detector,
+            secret_detector,
+            confidential_detector,
+        ],
+    )
+    yield built
+    built.audit.engine.dispose()
+
+
+@pytest.fixture
+def client(gateway_settings: Settings, gateway: Gateway) -> Iterator[TestClient]:
+    """Sends requests to the app without starting a real server."""
+    with TestClient(create_app(gateway_settings, gateway)) as test_client:
         yield test_client
+
+
+@pytest.fixture
+def api_keys(gateway: Gateway) -> dict[str, dict[str, str]]:
+    """Headers with a fresh client key and a fresh admin key."""
+    _, client_key = gateway.audit.api_keys.create("Test app")
+    _, admin_key = gateway.audit.api_keys.create("Test admin", role="admin")
+    return {"client": {"X-API-Key": client_key}, "admin": {"X-API-Key": admin_key}}
 
 
 # ---------- audit database (Phase 12) ----------

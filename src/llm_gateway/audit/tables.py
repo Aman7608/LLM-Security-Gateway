@@ -130,6 +130,8 @@ class FindingRecord(Base):
         ForeignKey("audit_event.request_id", ondelete="CASCADE"), index=True
     )
     direction: Mapped[str] = mapped_column(String(10))
+    # which part of the request, e.g. "messages[2]" or "documents[0]"
+    location: Mapped[str | None] = mapped_column(String(30))
     detector: Mapped[str] = mapped_column(String(30))
     category: Mapped[str] = mapped_column(String(50))
     entity_type: Mapped[str | None] = mapped_column(String(50))

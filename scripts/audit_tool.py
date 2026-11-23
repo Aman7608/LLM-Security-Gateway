@@ -23,9 +23,9 @@ import secrets
 import time
 
 from llm_gateway.audit.logger import EventFilter
+from llm_gateway.audit.parts import AuditParts
 from llm_gateway.core.audit_trail import build_audit_entry
 from llm_gateway.core.factory import (
-    AuditParts,
     build_audit,
     build_dlp_engine,
     build_output_guard,

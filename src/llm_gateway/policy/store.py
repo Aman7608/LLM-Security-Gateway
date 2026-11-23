@@ -38,6 +38,14 @@ from llm_gateway.policy.schema import (
 
 logger = logging.getLogger(__name__)
 
+
+class PolicySaveError(PolicyError):
+    """A new policy version could not be saved (for example, database down).
+
+    The policy itself may be fine. Nothing was changed.
+    """
+
+
 MAX_HISTORY = 50
 
 
@@ -215,7 +223,7 @@ class PolicyStore:
                 try:
                     self.on_change(version)
                 except Exception as error:
-                    raise PolicyError(
+                    raise PolicySaveError(
                         f"policy version {version.version} could not be saved "
                         f"({type(error).__name__}), so it was not made active"
                     ) from error

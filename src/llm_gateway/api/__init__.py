@@ -1,4 +1,5 @@
-"""HTTP routes and middleware.
+"""The web API: routes, API key checks, rate limits, error format and middleware.
 
-Phase 13 adds the API routes, API key checks, rate limits and error handling.
+The routes stay thin. The real work (checking, calling the AI, logging)
+happens in core/gateway.py, which knows nothing about HTTP.
 """

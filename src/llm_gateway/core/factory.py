@@ -7,10 +7,9 @@ tests can swap in fake detectors or a different policy easily.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from typing import Any
 
-from sqlalchemy import Engine
-
+from llm_gateway.audit.clients import ApiKeys
 from llm_gateway.audit.database import (
     create_db_engine,
     make_session_factory,
@@ -18,7 +17,9 @@ from llm_gateway.audit.database import (
 )
 from llm_gateway.audit.fingerprint import Fingerprinter
 from llm_gateway.audit.logger import AuditLogger
+from llm_gateway.audit.parts import AuditParts
 from llm_gateway.audit.policy_history import PolicyHistory
+from llm_gateway.core.gateway import Gateway
 from llm_gateway.core.output_guard import OutputGuard
 from llm_gateway.detectors.base import Detector
 from llm_gateway.detectors.confidential import ConfidentialDetector
@@ -29,6 +30,7 @@ from llm_gateway.dlp.engine import DLPEngine
 from llm_gateway.dlp.redactor import RedactionMode
 from llm_gateway.policy.engine import PolicyEngine
 from llm_gateway.policy.store import PolicyStore, PolicyVersion
+from llm_gateway.providers.registry import ProviderRegistry
 from llm_gateway.settings import Settings
 
 
@@ -96,16 +98,6 @@ def _policy_store(settings: Settings, history: PolicyHistory | None) -> PolicySt
     )
 
 
-@dataclass(frozen=True)
-class AuditParts:
-    """Everything the audit log needs, built together."""
-
-    engine: Engine
-    logger: AuditLogger
-    policy_history: PolicyHistory
-    fingerprinter: Fingerprinter
-
-
 def build_audit(settings: Settings, create_tables: bool = True) -> AuditParts:
     """Connect to the audit database and (by default) create or upgrade its tables."""
     engine = create_db_engine(settings.database_url)
@@ -117,4 +109,29 @@ def build_audit(settings: Settings, create_tables: bool = True) -> AuditParts:
         logger=AuditLogger(sessions, required=settings.audit_required),
         policy_history=PolicyHistory(sessions),
         fingerprinter=Fingerprinter.from_settings(settings),
+        api_keys=ApiKeys(sessions),
+    )
+
+
+def build_gateway(
+    settings: Settings,
+    detectors: list[Detector] | None = None,
+    audit: AuditParts | None = None,
+    http_client: Any = None,
+) -> Gateway:
+    """Build the whole gateway: detectors, policy, providers and audit log.
+
+    Slow the first time (the PII model loads). Tests pass ready-made
+    `detectors` and a test `audit` database to stay fast.
+    """
+    audit = audit or build_audit(settings)
+    engine = build_dlp_engine(settings, detectors, policy_history=audit.policy_history)
+    assert isinstance(engine.policy, PolicyEngine)  # noqa: S101 - built just above
+    return Gateway(
+        settings=settings,
+        engine=engine,
+        output_guard=build_output_guard(settings, engine),
+        registry=ProviderRegistry.from_settings(settings, http_client),
+        audit=audit,
+        policy_store=engine.policy.store,
     )

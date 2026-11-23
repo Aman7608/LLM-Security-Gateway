@@ -18,7 +18,7 @@ from collections import Counter
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 from sqlalchemy import Select, delete, func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, selectinload, sessionmaker
@@ -41,8 +41,10 @@ class EventFilter(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    since: datetime | None = None
-    until: datetime | None = None
+    # Times must say their timezone (e.g. 2026-11-20T10:00:00Z), so a search
+    # never silently means "local time" on one machine and UTC on another
+    since: AwareDatetime | None = None
+    until: AwareDatetime | None = None
     min_risk: RiskLevel | None = None  # this level or higher
     action: Action | None = None  # matches the prompt OR the answer decision
     finding_type: str | None = None  # e.g. "EMAIL_ADDRESS" or "jailbreak"
@@ -237,6 +239,7 @@ def _to_row(entry: AuditEntry) -> AuditEvent:
         findings=[
             FindingRecord(
                 direction=f.direction.value,
+                location=f.location,
                 detector=f.detector,
                 category=f.category,
                 entity_type=f.entity_type,
@@ -273,6 +276,7 @@ def _from_row(row: AuditEvent) -> AuditEntry:
         findings=tuple(
             FindingEntry(
                 direction=Direction(f.direction),
+                location=f.location,
                 detector=f.detector,
                 category=f.category,
                 entity_type=f.entity_type,

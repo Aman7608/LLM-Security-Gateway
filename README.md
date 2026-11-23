@@ -8,7 +8,7 @@ A security gateway that sits between apps and AI models like OpenAI GPT and Anth
 
 Then, based on configurable rules, it allows, warns about, hides (redacts) or blocks them.
 
-> **Status:** early development (Phase 12 of 19). The detectors, DLP engine and policy engine work, the gateway can talk to a free offline mock AI, OpenAI or Anthropic Claude, AI answers are checked for leaks before anyone sees them, and every decision is kept in a privacy-safe audit log. It is not connected to the web API yet. A full README comes in Phase 18.
+> **Status:** early development (Phase 13 of 19). The detectors, DLP engine and policy engine work, the gateway can talk to a free offline mock AI, OpenAI or Anthropic Claude, AI answers are checked for leaks before anyone sees them, every decision is kept in a privacy-safe audit log, and it all runs as a web API with API keys and rate limits. A full README comes in Phase 18.
 
 ## Quick start (Windows PowerShell)
 
@@ -41,3 +41,4 @@ Then open http://127.0.0.1:8000/health or the API docs at http://127.0.0.1:8000/
 | [docs/11-llm-providers.md](docs/11-llm-providers.md) | The mock, OpenAI and Claude providers, retries, timeouts and key safety |
 | [docs/12-output-scanner.md](docs/12-output-scanner.md) | Checking AI answers: confidential terms, system prompt leaks and the output guard |
 | [docs/13-audit-logging.md](docs/13-audit-logging.md) | The audit log: what is saved (and never saved), fingerprints, the database and policy history |
+| [docs/14-fastapi.md](docs/14-fastapi.md) | The web API: endpoints, API keys, limits, the error format, and how to call it |

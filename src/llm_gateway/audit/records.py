@@ -38,6 +38,7 @@ class FindingEntry(BaseModel):
     direction: Direction
     detector: str
     category: str
+    location: str | None = None  # e.g. "messages[2]"; positions are inside it
     entity_type: str | None
     rule_id: str | None
     confidence: float
@@ -48,10 +49,15 @@ class FindingEntry(BaseModel):
 
     @classmethod
     def from_finding(
-        cls, finding: Finding, direction: Direction, fingerprint: str | None = None
+        cls,
+        finding: Finding,
+        direction: Direction,
+        fingerprint: str | None = None,
+        location: str | None = None,
     ) -> FindingEntry:
         return cls(
             direction=direction,
+            location=location,
             detector=finding.detector,
             category=finding.category,
             entity_type=finding.entity_type,
@@ -97,6 +103,7 @@ def finding_entries(
     direction: Direction,
     text: str,
     fingerprint: Callable[[str], str] | None,
+    location: str | None = None,
 ) -> tuple[FindingEntry, ...]:
     """Turn findings into safe entries, adding a fingerprint of each value.
 
@@ -107,5 +114,5 @@ def finding_entries(
     for finding in findings:
         value = text[finding.start : finding.end]
         code = fingerprint(value) if fingerprint is not None and value else None
-        entries.append(FindingEntry.from_finding(finding, direction, code))
+        entries.append(FindingEntry.from_finding(finding, direction, code, location))
     return tuple(entries)

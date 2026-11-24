@@ -32,10 +32,30 @@ SECURITY_HEADERS = {
     b"referrer-policy": b"no-referrer",
     b"cache-control": b"no-store",  # answers may hold private data
 }
-# The API only returns JSON, so pages may load nothing at all. The API docs
-# (/docs, /redoc) load their scripts from a CDN, so they skip this one.
+# Content-Security-Policy tells the browser what a page may load and run.
+# The API only returns JSON, so its replies may load nothing at all.
 API_CSP = (b"content-security-policy", b"default-src 'none'; frame-ancestors 'none'")
+API_PATHS = ("/v1/", "/health", "/ready")
+# The dashboard pages may only load scripts, styles and data from this same
+# address. Even if attack text from the audit log somehow became HTML, the
+# browser would refuse to run it (no inline or outside scripts).
+DASHBOARD_CSP = (
+    b"content-security-policy",
+    b"default-src 'none'; script-src 'self'; style-src 'self'; "
+    b"img-src 'self' data:; font-src 'self'; connect-src 'self'; "
+    b"base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
+)
+# The API docs (/docs, /redoc) load their scripts from a CDN, so they get none
 DOCS_PATHS = ("/docs", "/redoc", "/openapi.json")
+
+
+def content_security_policy(path: str) -> tuple[bytes, bytes] | None:
+    """Which Content-Security-Policy a reply for this path gets."""
+    if path.startswith(DOCS_PATHS):
+        return None
+    if path.startswith(API_PATHS):
+        return API_CSP
+    return DASHBOARD_CSP  # the dashboard files (and 404s for unknown paths)
 
 
 def new_request_id() -> str:
@@ -65,8 +85,9 @@ class RequestContextMiddleware:
                 headers = list(message.get("headers", []))
                 headers.append((b"x-request-id", request_id.encode()))
                 headers += list(SECURITY_HEADERS.items())
-                if not path.startswith(DOCS_PATHS):
-                    headers.append(API_CSP)
+                policy = content_security_policy(path)
+                if policy is not None:
+                    headers.append(policy)
                 message["headers"] = headers
             await send(message)
 

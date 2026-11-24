@@ -156,6 +156,7 @@ def gateway_settings(tmp_path: Path) -> Settings:
         fingerprint_key=TEST_FINGERPRINT_KEY,
         provider_max_retries=0,  # no waiting between retries in tests
         rate_limit_per_minute=10_000,
+        dashboard_dir=None,  # tests that need it make their own (see test_whole_system)
     )
 
 

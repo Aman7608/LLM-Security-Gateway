@@ -272,6 +272,7 @@ def running_gateway() -> Iterator[tuple[TestClient, dict[str, str]]]:
             fingerprint_key=secrets.token_hex(32),
             provider_max_retries=0,
             rate_limit_per_minute=100_000,
+            dashboard_dir=None,
         )
         with TestClient(create_app(settings)) as client:
             gateway: Gateway = client.app.state.gateway  # type: ignore[attr-defined]

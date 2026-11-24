@@ -5,6 +5,7 @@ Findings here are made by hand, so these tests do not need any detector.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -288,6 +289,17 @@ def test_detector_error_only_warns_when_fail_mode_is_open() -> None:
     decision = open_engine.decide(scan(errors=("pii",)))
     assert decision.action is Action.WARN
     assert "fail mode is open" in decision.reasons[-1]
+
+
+def test_fail_open_is_logged_as_a_warning(caplog: pytest.LogCaptureFixture) -> None:
+    """Turning off the safer default must be visible in the logs (NFR-02)."""
+    with caplog.at_level(logging.WARNING, logger="llm_gateway.policy.engine"):
+        engine([rule("r", "warn")], fail_mode=FailMode.OPEN)
+    assert "Fail mode is OPEN" in caplog.text
+    caplog.clear()
+    with caplog.at_level(logging.WARNING, logger="llm_gateway.policy.engine"):
+        engine([rule("r", "warn")])  # closed, the default
+    assert caplog.text == ""
 
 
 def test_fail_open_never_lowers_a_stricter_decision() -> None:

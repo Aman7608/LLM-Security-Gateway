@@ -8,7 +8,7 @@ A security gateway that sits between apps and AI models like OpenAI GPT and Anth
 
 Then, based on configurable rules, it allows, warns about, hides (redacts) or blocks them.
 
-> **Status:** early development (Phase 16 of 19; Phase 15, Docker, is postponed). The detectors, DLP engine and policy engine work, the gateway can talk to a free offline mock AI, OpenAI or Anthropic Claude, AI answers are checked for leaks before anyone sees them, every decision is kept in a privacy-safe audit log, and it all runs as a web API with API keys and rate limits, with a dashboard for admins. A red team test of 137 new cases measures what gets through: see [docs/red-team-report.md](docs/red-team-report.md). A full README comes in Phase 18.
+> **Status:** early development (Phase 17 of 19; Phase 15, Docker, is postponed). The detectors, DLP engine and policy engine work, the gateway can talk to a free offline mock AI, OpenAI or Anthropic Claude, AI answers are checked for leaks before anyone sees them, every decision is kept in a privacy-safe audit log, and it all runs as a web API with API keys and rate limits, with a dashboard for admins. A red team test of 137 new cases measures what gets through: see [docs/red-team-report.md](docs/red-team-report.md). A full README comes in Phase 18.
 
 ## Quick start (Windows PowerShell)
 
@@ -24,7 +24,11 @@ py -3.12 -m venv .venv
 
 Then open http://127.0.0.1:8000/health or the API docs at http://127.0.0.1:8000/docs.
 
-For the dashboard, see [docs/15-dashboard.md](docs/15-dashboard.md) (it needs Node.js and an admin key).
+To run everything the real way (API and dashboard at one address, production mode), see [docs/17-final-integration.md](docs/17-final-integration.md) section 8. In short, with a `GATEWAY_FINGERPRINT_KEY` in `.env` and Node.js installed:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\serve.py --build
+```
 
 ## Documents
 
@@ -47,3 +51,4 @@ For the dashboard, see [docs/15-dashboard.md](docs/15-dashboard.md) (it needs No
 | [docs/15-dashboard.md](docs/15-dashboard.md) | The admin dashboard: pages, how it talks to the API, security choices, tests and limits |
 | [docs/16-red-team.md](docs/16-red-team.md) | Red team testing: how the attack test works, what got through and why |
 | [docs/red-team-report.md](docs/red-team-report.md) | The measured red team results (written by `scripts/red_team.py`) |
+| [docs/17-final-integration.md](docs/17-final-integration.md) | Everything together: one address, the start command, the whole-system test, and every requirement checked |

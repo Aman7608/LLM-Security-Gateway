@@ -67,6 +67,10 @@ class Settings(BaseSettings):
     secret_patterns_file: Path = Path("config/secret_patterns.yaml")
     confidential_terms_file: Path = Path("config/confidential_terms.yaml")
     database_url: str = "sqlite:///./data/gateway.db"
+    # The built dashboard (made with `npm run build` in frontend/). If the
+    # folder has an index.html, the gateway serves the dashboard at "/".
+    # Leave it empty to turn the dashboard off.
+    dashboard_dir: Path | None = Path("frontend/dist")
 
     # AI providers
     default_provider: ProviderName = ProviderName.MOCK

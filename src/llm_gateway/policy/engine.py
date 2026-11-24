@@ -15,6 +15,7 @@ How a decision is made (docs/10-policy-engine.md explains each step):
 
 from __future__ import annotations
 
+import logging
 from collections import Counter
 from collections.abc import Iterable
 
@@ -34,6 +35,8 @@ from llm_gateway.policy.schema import Policy, PolicyRule
 from llm_gateway.policy.store import PolicyStore
 from llm_gateway.settings import FailMode
 
+logger = logging.getLogger(__name__)
+
 
 class PolicyEngine:
     """Decides what to do with a ScanResult, using the current policy."""
@@ -50,6 +53,13 @@ class PolicyEngine:
             else PolicyStore.from_policy(policy)
         )
         self.fail_mode = fail_mode
+        if fail_mode is FailMode.OPEN:
+            # Safer default turned off: make sure it shows up in the logs (NFR-02)
+            logger.warning(
+                "Fail mode is OPEN: if a detector crashes, prompts and answers "
+                "are let through unchecked (only warned). Use "
+                "GATEWAY_FAIL_MODE=closed to block them instead."
+            )
 
     @property
     def policy(self) -> Policy:

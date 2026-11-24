@@ -21,6 +21,7 @@ from collections.abc import AsyncIterator
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from llm_gateway import __version__
 from llm_gateway.api import admin, routes
@@ -104,7 +105,28 @@ def create_app(
 
     app.include_router(routes.router)
     app.include_router(admin.router)
+    _add_dashboard(app, settings)
     return app
+
+
+def _add_dashboard(app: FastAPI, settings: Settings) -> None:
+    """Serve the built dashboard at "/", so everything runs at one address.
+
+    It is added LAST, so every API route above wins over a file with the same
+    name. The browser then sees the dashboard and the API at the same
+    address, so the API needs no CORS settings.
+    """
+    folder = settings.dashboard_dir
+    if folder is None:
+        return
+    if not (folder / "index.html").is_file():
+        logger.info(
+            "No dashboard at %s (build it with: cd frontend; npm run build)", folder
+        )
+        return
+    # html=True: "/" shows index.html. StaticFiles refuses paths that try to
+    # leave the folder (like /../.env)
+    app.mount("/", StaticFiles(directory=folder, html=True), name="dashboard")
 
 
 async def _delete_old_events_forever(gateway: Gateway) -> None:

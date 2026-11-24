@@ -163,7 +163,9 @@ code "C:\Users\amanc\Desktop\LLM Security Guard New"
 
 ## 6. Docker
 
-Docker is installed, but **Docker Desktop is not running**. We do not need it until Phase 15. When you are ready:
+> **Update (Phase 18):** Phase 15 (Docker) is postponed. On 23 November 2026, Docker Desktop crashed at start with "initializing Inference manager ... The file cannot be accessed by the system", caused by broken leftover files in `%LOCALAPPDATA%\Docker\run`. That folder was renamed to `run.broken-20261123` (nothing deleted). The gateway runs without Docker using `scripts\serve.py` (see [17-final-integration.md](17-final-integration.md)), and the untested Docker files wait on the branch `docker-later`.
+
+Docker is installed. When you are ready:
 
 1. Start **Docker Desktop** from the Start menu and wait for *"Engine running"*.
 2. Check it:

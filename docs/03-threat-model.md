@@ -165,16 +165,18 @@ Four rows stay at medium or high risk: **T2, I1, I2 and E2**. They all come from
 
 ## 6. How the threat model shapes the code
 
-| Threat | Where it turns into code | Phase |
-|---|---|---|
-| T2 hidden text tricks | `TextNormalizer` and the decode-and-re-check step | 5 |
-| I1 PII sent to the AI | `PIIDetector` and the Redactor | 6, 8 |
-| I1, I2 secrets | `SecretDetector` | 7 |
-| T1 weakened policy | `PolicyLoader` checks and policy versions | 9 |
-| S3 fake provider, D3 provider down | HTTPS, timeouts and retries in the providers | 10 |
-| I2 leaking answers | Answer scanning | 11 |
-| I3 secrets in logs | Fingerprints and safe audit records | 12 |
-| S1, E1, D1, I4 | Key check, roles, rate limits, error handler | 13 |
-| E3 XSS | Safe rendering in the dashboard | 14 |
-| T3, TB3 database access | Docker network setup | 15 |
-| All of them | Red team test cases for each row of the STRIDE table | 16 |
+| Threat | Where it turns into code | Phase | Built? (checked in Phase 18) |
+|---|---|---|---|
+| T2 hidden text tricks | `TextNormalizer` and the decode-and-re-check step | 5 | Yes. Base64, invisible characters, look-alike letters and spacing are undone. ROT13, reversed text and hex are not (red team) |
+| I1 PII sent to the AI | `PIIDetector` and the Redactor | 6, 8 | Yes. Red team: 9 of 10 hidden before the AI saw them |
+| I1, I2 secrets | `SecretDetector` | 7 | Yes. Red team: 8 of 10 hidden |
+| T1 weakened policy | `PolicyLoader` checks and policy versions | 9 | Yes. Broken policies are refused, every change is a saved version with who made it |
+| S3 fake provider, D3 provider down | HTTPS, timeouts and retries in the providers | 10 | Yes |
+| I2 leaking answers | Answer scanning | 11 | Yes, plus a canary in every system prompt. Red team: all 4 answer leaks and all 8 system prompt thefts stopped |
+| I3 secrets in logs | Fingerprints and safe audit records | 12 | Yes. A test searches the database file byte by byte for planted values (Phase 17) |
+| S1, E1, D1, I4 | Key check, roles, rate limits, error handler | 13 | Yes |
+| E3 XSS | Safe rendering in the dashboard | 14 | Yes, plus a strict Content-Security-Policy on the dashboard pages (Phase 17) |
+| T3, TB3 database access | Docker network setup | 15 | **Not yet.** Docker is postponed. The database is a local file, protected only by the computer's own file permissions |
+| All of them | Red team test cases for each row of the STRIDE table | 16 | **Partly.** The red team covers the AI-specific rows (T2, I1, I2). The API rows (S1, E1, D1, I4) are covered by `tests/security/test_api_security.py` and the API tests instead |
+
+The rows that stay at medium or high risk (T2, I1, I2, E2) were measured in the red team test: 31 of 67 new attacks got through. See [16-red-team.md](16-red-team.md).

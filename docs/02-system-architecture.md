@@ -681,3 +681,38 @@ Nothing was removed. The design made two rules clearer:
 
 1. Prompt injection findings can only be **Warn** or **Block**, never Redact (section 4.1).
 2. A blocked **prompt** returns **403**. A blocked **answer** returns **200** with `blocked: true` (section 7.2).
+
+---
+
+## 13. Planned vs built (added in Phase 18)
+
+This document was written in Phase 2, before any code. Most of the design was built as planned. These are the places where the finished gateway is different, and why.
+
+### Added
+
+| What | Phase | Why |
+|---|---|---|
+| A **ConfidentialDetector** for your secret project names and "confidential" markings | 11 | Company secrets are not personal data or keys, but must not leak either |
+| A **system prompt leak check** with a secret marker (a "canary") added to every system prompt | 11 | Catches the AI repeating its hidden instructions, even when the attack itself was missed. In the red team test it stopped 7 attacks that got past the prompt checks |
+| **Documents** in a chat request, checked like messages and sent to the AI inside `<document>` tags | 13 | Indirect prompt injection (FR-04) |
+| **Earlier assistant messages are checked** too | 13 | The client sends them, so they could be fake |
+| `GET /v1/policies/history` and `GET /v1/stats/timeline` | 13, 14 | The dashboard needs the policy versions and a risk chart over time |
+| A **limit on the characters in one chat** (`GATEWAY_MAX_REQUEST_CHARS`), checked before scanning | 13 | Measuring showed long texts take seconds to scan, so one big request could keep the gateway busy |
+| The gateway **serves the built dashboard** at `/` | 17 | One address, one program, and no CORS settings needed |
+
+### Different from the plan
+
+| Planned | Built | Why |
+|---|---|---|
+| A time limit per scan (section 9) | Size limits instead: texts over `GATEWAY_MAX_PROMPT_CHARS` are blocked, and whole chats over `GATEWAY_MAX_REQUEST_CHARS` get 413 | A time limit can't stop a scan already running in a thread. Limiting the size before scanning keeps the time short |
+| Missing language model: `/ready` says not ready (section 9) | The gateway does not start at all, with a clear error | It can't do its main job without the model, so failing at startup is clearer |
+| Tables as in section 8.1 | The same tables, plus a `location` column on `finding_record` (for example `messages[2]`) | A chat has many parts, so the log must say which part a finding was in |
+| PostgreSQL for production (section 8.2) | Only SQLite is tested | It works for one copy of the gateway. PostgreSQL support is in the code (SQLAlchemy) but untested |
+| Docker (Phase 15) | Postponed | Docker Desktop doesn't start on the development PC. The untested files are on the branch `docker-later` |
+| An optional machine learning classifier (FR-14) | Not built | It was a "Could". The red team test shows it is the most useful next step |
+
+### Rules that held up
+
+- **Detectors only import the shared data models and settings**, and the API never imports detectors directly. A test (`tests/unit/test_architecture.py`) checks these import rules on every run, so they could never be broken by accident.
+- **Prompt injection is never redacted**, only warned about or blocked (section 4.1).
+- A blocked prompt is **403**, a withheld answer is **200** with `blocked: true` (section 7.2).

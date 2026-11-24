@@ -8,51 +8,74 @@ This document explains every folder and important file, how the modules depend o
 
 ## 1. The folder tree
 
+The tree as it is at the end of Phase 18 (it was first written in Phase 4, when most folders were still empty):
+
 ```text
 LLM Security Guard New/
-├── .env.example            example settings (copy to .env)
-├── .editorconfig           editor spacing and line endings
-├── .gitattributes          line endings stored in git
-├── .gitignore              files git must never save
-├── .vscode/                VS Code settings and extensions
-├── README.md               short intro and quick start
-├── pyproject.toml          project info + pytest, ruff, mypy settings
-├── requirements.txt        packages needed to run (pinned)
-├── requirements-dev.txt    + test and code-check tools
+├── .env.example              example settings (copy to .env)
+├── .editorconfig             editor spacing and line endings
+├── .gitattributes            line endings stored in git
+├── .gitignore                files git must never save
+├── .vscode/                  VS Code settings and extensions
+├── README.md                 what it is, results, quick start
+├── alembic.ini               database migration settings (Phase 12)
+├── pyproject.toml            project info + pytest, ruff, mypy settings
+├── requirements.txt          packages needed to run (pinned)
+├── requirements-dev.txt      + test and code-check tools
+├── requirements-providers.txt  + the OpenAI and Anthropic packages (optional)
 │
-├── config/                 rule and policy YAML files (from Phase 5)
-│   └── README.md
+├── config/                   rule and policy files (see config/README.md)
+│   ├── policy.yaml               what to do with each finding (Phase 9)
+│   ├── injection_rules.yaml      prompt injection patterns (Phase 5)
+│   ├── pii_entities.yaml         kinds of personal data (Phase 6)
+│   ├── secret_patterns.yaml      key, token and password patterns (Phase 7)
+│   ├── confidential_terms.yaml   your secret project names (Phase 11)
+│   └── examples/                 example policies
 │
-├── docs/                   all project documents
+├── docs/                     all project documents (listed in the README)
+│
+├── frontend/                 the admin dashboard: React + TypeScript (Phase 14)
+│   ├── src/                      pages, components, API client, tests
+│   └── dist/                     the built dashboard (not in Git)
+│
+├── redteam/                  the red team test set and its runner (Phase 16)
 │
 ├── scripts/
-│   └── check_env.py        checks the development setup
+│   ├── serve.py              start the whole gateway (Phase 17)
+│   ├── manage_keys.py        create and disable API keys (Phase 13)
+│   ├── red_team.py           run the red team, write the report (Phase 16)
+│   ├── audit_tool.py         look at the audit log by hand (Phase 12)
+│   ├── try_provider.py       try a prompt through the checks (Phase 10)
+│   ├── injection_report.py   injection detector numbers (Phase 5)
+│   └── check_env.py          checks the development setup (Phase 3)
 │
 ├── src/
-│   └── llm_gateway/        our Python package (all gateway code)
-│       ├── __init__.py     package version
-│       ├── main.py         creates the FastAPI app
-│       ├── settings.py     all settings, read from environment variables
-│       ├── models.py       shared data objects (Finding, Decision, ...)
-│       ├── api/            HTTP routes and middleware       (Phase 13)
-│       ├── core/           the pipeline that runs each step (Phase 8)
-│       ├── detectors/      injection, PII, secret detectors (Phases 5-7)
-│       ├── dlp/            runs detectors, redacts text     (Phase 8)
-│       ├── policy/         turns findings into decisions    (Phase 9)
-│       ├── providers/      mock, OpenAI, Claude             (Phase 10)
-│       └── audit/          privacy-safe logging             (Phase 12)
+│   └── llm_gateway/          our Python package (all gateway code)
+│       ├── __init__.py       package version
+│       ├── main.py           creates the FastAPI app, serves the dashboard
+│       ├── settings.py       all settings, read from environment variables
+│       ├── models.py         shared data objects (Finding, Decision, ...)
+│       ├── api/              HTTP routes, keys, rate limits, errors (Phase 13)
+│       ├── core/             the main flow, with no web code (Phases 8, 13)
+│       ├── detectors/        injection, PII, secrets, confidential terms,
+│       │                     system prompt leaks (Phases 5-7, 11)
+│       ├── dlp/              runs detectors, redacts text (Phase 8)
+│       ├── policy/           turns findings into decisions (Phase 9)
+│       ├── providers/        mock, OpenAI, Claude (Phase 10)
+│       └── audit/            privacy-safe logging, API keys, migrations (Phase 12)
 │
 └── tests/
-    ├── conftest.py         shared test setup
-    ├── unit/               one piece at a time
-    ├── integration/        several pieces together
-    ├── security/           attacks and leaks (Phase 16)
-    └── e2e/                the whole running system (Phase 17)
+    ├── conftest.py           shared test setup
+    ├── data/                 fake samples (attacks, personal data, fake secrets)
+    ├── unit/                 one piece at a time
+    ├── integration/          several pieces together
+    ├── security/             attacks, leaks and the red team
+    └── e2e/                  the whole system (a real server, the whole-system story)
 ```
 
-Not in Git, but created on your computer: `.venv/` (virtual environment), `.env` (your real settings, if you make one) and `data/` (the database, from Phase 12).
+Not in Git, but created on your computer: `.venv/` (virtual environment), `.env` (your real settings, if you make one), `data/` (the database), and `frontend/node_modules/` and `frontend/dist/`.
 
-Later phases add `frontend/` (the dashboard, added in Phase 14; see [15-dashboard.md](15-dashboard.md)) and the Docker files (Phase 15).
+The Docker files (Phase 15) are on the branch `docker-later` until Docker is finished.
 
 ---
 
@@ -192,24 +215,7 @@ Settings are applied in this order (a later one wins):
 2. the `.env` file
 3. a real environment variable (for example, one set by Docker)
 
-| Variable | Default | What it does |
-|---|---|---|
-| `GATEWAY_ENVIRONMENT` | `development` | `development`, `test` or `production` |
-| `GATEWAY_LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING` or `ERROR` |
-| `GATEWAY_HOST` | `127.0.0.1` | Address to listen on. The default is only reachable from your own computer |
-| `GATEWAY_PORT` | `8000` | Port to listen on (1 to 65535) |
-| `GATEWAY_POLICY_FILE` | `config/policy.yaml` | Policy file (Phase 9) |
-| `GATEWAY_DATABASE_URL` | `sqlite:///./data/gateway.db` | Database (Phase 12) |
-| `GATEWAY_DEFAULT_PROVIDER` | `mock` | `mock`, `openai` or `anthropic` |
-| `GATEWAY_OPENAI_API_KEY` | not set | Needed only for OpenAI |
-| `GATEWAY_ANTHROPIC_API_KEY` | not set | Needed only for Claude |
-| `GATEWAY_PROVIDER_TIMEOUT_SECONDS` | `30` | How long to wait for the AI (up to 300) |
-| `GATEWAY_PROVIDER_MAX_RETRIES` | `2` | Retries on temporary errors (0 to 5) |
-| `GATEWAY_FAIL_MODE` | `closed` | `closed` blocks if a check crashes, `open` lets it through with a warning |
-| `GATEWAY_MAX_PROMPT_CHARS` | `20000` | Longest prompt accepted |
-| `GATEWAY_STORE_REDACTED_PROMPTS` | `false` | Save redacted prompts in the log (off for privacy) |
-| `GATEWAY_LOG_RETENTION_DAYS` | `30` | Delete log rows older than this |
-| `GATEWAY_FINGERPRINT_KEY` | not set | Secret key for fingerprints. **Required in production** |
+The gateway now has 30 settings. They are all listed, with their defaults and allowed values, in **[settings.md](settings.md)**. A test checks that list against the code, so it stays correct. (Until Phase 18 this section had its own table, which had fallen behind: it listed 16 settings and an old timeout default.)
 
 **Why the `GATEWAY_` prefix?** It stops our settings from clashing with other programs. For example, the official OpenAI library reads `OPENAI_API_KEY` by itself. Using our own name means only our code decides when that key is used.
 

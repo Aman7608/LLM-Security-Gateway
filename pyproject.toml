@@ -52,7 +52,7 @@ skip_covered = false
 [tool.ruff]
 line-length = 88
 target-version = "py312"
-src = ["src", "tests"]
+src = ["src", "."]  # our own code: the package, tests/ and redteam/
 
 [tool.ruff.lint]
 # E/W = PEP 8 style, F = real errors, I = import order, B = common bugs,

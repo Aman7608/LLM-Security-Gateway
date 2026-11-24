@@ -17,9 +17,8 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))  # so we can import tests.data
 
-from tests.data.injection_samples import BENIGN, KNOWN_MISSES, MALICIOUS  # noqa: E402
-
 from llm_gateway.detectors.injection import InjectionDetector  # noqa: E402
+from tests.data.injection_samples import BENIGN, KNOWN_MISSES, MALICIOUS  # noqa: E402
 
 BLOCK_THRESHOLD = 0.7
 

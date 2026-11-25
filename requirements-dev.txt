@@ -13,4 +13,4 @@ pytest-cov==7.1.0     # shows how much code the tests cover
 httpx2==2.16.2        # used by FastAPI's TestClient (the old httpx gives a warning)
 ruff==0.17.5          # checks code style (PEP 8) and formats code
 mypy==2.4.1           # checks type hints
-types-PyYAML==6.0.12.20261113  # type information for PyYAML, so mypy can check it
+types-PyYAML==6.0.12.20261122  # type information for PyYAML, so mypy can check it

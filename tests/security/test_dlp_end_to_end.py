@@ -112,6 +112,15 @@ def test_redacted_prompt_does_not_reveal_values_in_reasons(
     assert "priya" not in joined
 
 
+def coverage_is_measuring() -> bool:
+    """True while pytest --cov records every line (that makes code much slower)."""
+    try:
+        import coverage
+    except ImportError:
+        return False
+    return coverage.Coverage.current() is not None
+
+
 def test_engine_is_fast_enough(dlp_engine: DLPEngine) -> None:
     """NFR-05: the gateway's own checks should add less than 150 ms for a
     2,000-character prompt.
@@ -120,7 +129,13 @@ def test_engine_is_fast_enough(dlp_engine: DLPEngine) -> None:
     a run slower, never faster, so the fastest run is the best measure of
     what our code itself costs. (The median of 5 failed now and then while
     the computer was busy, even though the code had not changed.)
+
+    Skipped while coverage is measuring: recording every line slows the code
+    down a lot, so the time would say nothing about the gateway. (It failed
+    that way in Phases 14 and 17.) Normal runs and CI still check it.
     """
+    if coverage_is_measuring():
+        pytest.skip("timing is not meaningful while coverage records every line")
     base = "Please review the report from Rahul (rahul@example.com) before Friday. "
     text = (base * 40)[:2000]
     dlp_engine.process(text, Direction.INPUT)  # warm-up

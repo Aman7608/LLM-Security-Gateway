@@ -4,7 +4,7 @@
 #   .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 
 # Added in Phase 3
-fastapi==0.163.2            # web framework for the API
+fastapi==0.165.0            # web framework for the API
 uvicorn[standard]==0.54.0   # server that runs the FastAPI app
 pydantic==2.14.3            # checks that data has the right shape and types
 pydantic-settings==2.16.3   # reads settings from environment variables

@@ -4,4 +4,4 @@
 #   .\.venv\Scripts\python.exe -m pip install -r requirements-providers.txt
 
 openai==3.54.0      # OpenAI API
-anthropic==2.10.0   # Anthropic Claude API
+anthropic==2.12.0   # Anthropic Claude API

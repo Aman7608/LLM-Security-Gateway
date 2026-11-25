@@ -1,0 +1,30 @@
+# Dependabot opens a pull request when one of our packages has a new version
+# or a security fix. Every pull request runs the CI checks, so an update that
+# breaks something is caught before it is merged. Nothing is merged by itself.
+# Its messages look like "Bump fastapi from 1.0 to 1.1" (no prefixes).
+
+version: 2
+updates:
+  # Python packages (requirements*.txt)
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  # Dashboard packages (frontend/package.json)
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # One pull request for all small updates, instead of one per package
+      small-updates:
+        update-types: [minor, patch]
+
+  # The GitHub Actions in .github/workflows
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

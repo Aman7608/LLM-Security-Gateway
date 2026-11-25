@@ -1,5 +1,8 @@
 # LLM Security Gateway
 
+[![CI](https://github.com/Aman7608/LLM-Security-Gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/Aman7608/LLM-Security-Gateway/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A self-hosted security gateway that sits between your apps and AI models like OpenAI GPT and Anthropic Claude. Every prompt and every AI answer goes through it and is checked for:
 
 - **prompt injection**: attempts to make the AI ignore its instructions, reveal its hidden system prompt, or follow orders hidden inside documents
@@ -59,6 +62,7 @@ Measured, not guessed. Everything below comes from tests in this repository.
 - dashboard: 36 tests
 - Ruff and strict mypy are clean
 - every known miss is kept visible as an expected-failure test
+- all of these run on GitHub for every push (the CI badge at the top)
 
 ---
 
@@ -192,6 +196,14 @@ docs/               the guides below
 
 ---
 
+## Security
+
+Found a way past the gateway, or a leak? Please report it privately, not in a public issue. See [SECURITY.md](SECURITY.md).
+
 ## Status
 
-Phases 1 to 14 and 16 to 18 of 19 are done. Phase 15 (Docker) is postponed. Phase 19 (finishing the GitHub repository, including choosing a license) is next. Until a license is added, all rights are reserved.
+Version **0.1.0**. All 19 planned phases are done except Phase 15 (Docker), which is postponed: Docker Desktop doesn't start on the development PC, so the untested Docker files are on the branch `docker-later`. The most useful next steps are in [the red team guide](docs/16-red-team.md) (section 4).
+
+## License
+
+[MIT](LICENSE). You may use, change and share this code, as long as you keep the copyright line.

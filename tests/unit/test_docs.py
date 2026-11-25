@@ -22,6 +22,7 @@ MARKDOWN = [
     ROOT / "README.md",
     *sorted(DOCS.glob("*.md")),
     ROOT / "config" / "README.md",
+    ROOT / "SECURITY.md",
 ]
 SETTINGS_DOC = DOCS / "settings.md"
 

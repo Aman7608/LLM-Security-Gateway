@@ -8,16 +8,19 @@ This document explains every folder and important file, how the modules depend o
 
 ## 1. The folder tree
 
-The tree as it is at the end of Phase 18 (it was first written in Phase 4, when most folders were still empty):
+The tree as it is at the end of Phase 19 (it was first written in Phase 4, when most folders were still empty):
 
 ```text
 LLM Security Guard New/
 ├── .env.example              example settings (copy to .env)
+├── .github/                  automatic tests (workflows/ci.yml) and Dependabot (Phase 19)
 ├── .editorconfig             editor spacing and line endings
 ├── .gitattributes            line endings stored in git
 ├── .gitignore                files git must never save
 ├── .vscode/                  VS Code settings and extensions
+├── LICENSE                   MIT license (Phase 19)
 ├── README.md                 what it is, results, quick start
+├── SECURITY.md               how to report a security problem (Phase 19)
 ├── alembic.ini               database migration settings (Phase 12)
 ├── pyproject.toml            project info + pytest, ruff, mypy settings
 ├── requirements.txt          packages needed to run (pinned)

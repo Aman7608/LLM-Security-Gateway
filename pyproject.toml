@@ -12,6 +12,8 @@ description = "A security gateway that checks prompts and AI answers for prompt 
 readme = "README.md"
 requires-python = ">=3.12"
 authors = [{ name = "Aman Kumar" }]
+license = "MIT"
+license-files = ["LICENSE"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
